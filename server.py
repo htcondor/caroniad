@@ -27,7 +27,7 @@ import getopt
 import tarfile
 import random
 from subprocess import *
-from workfetch_common import *
+from mrg_hooks.functions import *
 from aws_common import *
 from boto.sqs.connection import SQSConnection
 from boto.sqs.message import Message
@@ -428,11 +428,11 @@ def handle_prepare_job(req_socket, reply, s3_storage, known_items, log):
 
    try:
       # Find the SQSMessageId in the message received
-      message_id = grep('^SQSMessageId\s*=\s*"(.+)"$', reply.data)
-      if message_id == None:
+      message_ids = grep('^SQSMessageId\s*=\s*"(.+)"$', reply.data)
+      if message_ids == None:
          raise general_exception(syslog.LOG_ERR, reply.data, 'Unable to find SQSMessageId in prepare job message')
       else:
-         message_id = message_id[0]
+         message_id = message_ids[0]
 
       # Find the Current Working Directory  of the originating process
       # in the message received
@@ -486,11 +486,11 @@ def handle_update_job_status(msg, queue, known_items, log):
 
    try:
       # Find the SQSMessageId in the message received
-      message_id = grep('^SQSMessageId\s*=\s*"(.+)"$', msg.data)
-      if message_id == None:
+      message_ids = grep('^SQSMessageId\s*=\s*"(.+)"$', msg.data)
+      if message_ids == None:
          raise general_exception(syslog.LOG_ERR, msg.data, 'Unable to find SQSMessageId in exit message')
       else:
-         message_id = message_id[0]
+         message_id = message_ids[0]
 
       saved_work = known_items.get_work(message_id)
       if log == True:
@@ -568,13 +568,6 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
       # in the message received
       work_cwd = grep('^OriginatingCWD\s*=\s*"(.+)"$', msg.data)[0]
 
-      # Create the list of files to put into the results archive
-      file_list += os.listdir(".")
-      for attrib in transfer_file_attribs:
-         match = grep('^' + attrib + '\s*=\s*"(.+)"$', msg.data)
-         if match != None and match[0] != None and match[0] not in file_list:
-            file_list += match[0].split(',')
-
       # Retrieve the SQS message from the list of known messages so it
       # can be acknowledged or released
       saved_work = known_items.remove_work(message_id)
@@ -603,9 +596,19 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
                s3_key.key = str(aws_access_key) + '-' + str(rand_num)
                results.s3_key = s3_key.key
 
-            # Archive all the important files
+            # Create the list of files to put into the results archive
             orig_cwd = os.getcwd()
             os.chdir(work_cwd)
+            file_list += os.listdir(".")
+            for attrib in transfer_file_attribs:
+               match = grep('^' + attrib + '\s*=\s*"(.+)"$', msg.data)
+               if match != None and match[0] != None:
+                  for file in match[0].split(','):
+                     if file not in file_list:
+                        # Only add the file to the list if wasn't there already
+                        file_list += file
+
+            # Archive all the important files
             results_filename = work_cwd + '/results.tar.gz'
             results_file = tarfile.open(results_filename, 'w:gz')
             for file in file_list:
@@ -693,7 +696,7 @@ def main(argv=None):
 
    try:
       try:
-         opts, args = getopt.getopt(argv[1:], 'd', ['debug'])
+         opts, args = getopt.getopt(argv[1:], 'dh', ['debug', 'help'])
       except getopt.GetoptError, error:
         print str(error)
         return(FAILURE)
@@ -702,6 +705,9 @@ def main(argv=None):
       for option, arg in opts:
          if option in ('-d', '--debug'):
             debug_logging = True
+         if option in ('-h', '--help'):
+            print 'usage: ' + os.path.basename(argv[0]) + ' [-d|--debug] [-h|--help]'
+            return(SUCCESS)
 
       # Open a connection to the system logger
       syslog.openlog(os.path.basename(argv[0]))
@@ -728,36 +734,12 @@ def main(argv=None):
       queue_name = data[2].rstrip()
 
       try:
-         sqs_config = read_config_file('/etc/opt/grid/grid_amqp.conf', 'Daemon')
+         sqs_config = read_config_file('/etc/opt/grid/daemon.conf', 'Daemon')
       except config_err, error:
          raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
 
       # Create a container to share data between threads
       share_data = global_data()
-
-#      # Read the AWS Access Key
-#      if os.path.exists(access_key_filename) == True:
-#         file_obj = open(access_key_filename)
-#         access_key = file_obj.read()
-#         file_obj.close()
-#         access_key = access_key.rstrip()
-#      else:
-#         # TODO: Send an error message to the SQS status queue.  For now,
-#         # print a message to the screen
-#         print "ERROR: Unable to find AWS access key"
-#         return(FAILURE)
-#
-#      # Read the AWS Secret Key
-#      if os.path.exists(secret_key_filename) == True:
-#         file_obj = open(secret_key_filename)
-#         secret_key = file_obj.read()
-#         file_obj.close()
-#         secret_key = secret_key.rstrip()
-#      else:
-#         # TODO: Send an error message to the SQS status queue.  For now,
-#         # print a message to the screen
-#         print "ERROR: Unable to find AWS secret key"
-#         return(FAILURE)
 
       # Open a connection to the AWS SQS service
       sqs_connection = SQSConnection(access_key, secret_key)
@@ -811,11 +793,12 @@ def main(argv=None):
               condor_msg.type == condor_wf_types.exit_hold or \
               condor_msg.type == condor_wf_types.exit_evict:
             child = threading.Thread(target=handle_exit, args=(sock, condor_msg, s3_connection, work_queue, status_queue, share_data, debug_logging))
-#            try:
-#               listen_socket.shutdown(socket.SHUT_RDWR)
-#            except:
-#               pass
-#            listen_socket.close()
+            # Only handle 1 job
+            try:
+               listen_socket.shutdown(socket.SHUT_RDWR)
+            except:
+               pass
+            listen_socket.close()
          else:
             syslog.syslog(syslog.LOG_WARNING, 'Received unknown request: %d' % condor_msg.type)
             continue
