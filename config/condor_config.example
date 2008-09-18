@@ -1,0 +1,115 @@
+##--------------------------------------------------------------------
+##  Job Router Configuration
+##--------------------------------------------------------------------
+## These settings become the default settings for all routes
+JOB_ROUTER_DEFAULTS = \
+  [ \
+    MaxIdleJobs = 10; \
+    MaxJobs = 200; \
+\
+    /* now modify routed job attributes */ \
+    /* remove routed job if it goes on hold or stays idle for over 6 hours */ \
+    set_PeriodicRemove = JobStatus == 5 || \
+                         (JobStatus == 1 && (CurrentTime - QDate) > 3600*6); \
+    set_requirements = true; \
+    set_WantAWS = false; \
+  ]
+
+# Define each of the routes to send jobs on
+JOB_ROUTER_ENTRIES = \
+  [ GridResource = "condor localhost $(COLLECTOR_HOST)"; \
+    Name = "Amazon Small"; \
+    requirements=target.WantAWS is true && (target.Universe is vanilla || target.Universe is 5) && (target.WantArch is "INTEL" || target.WantArch is UNDEFINED) && (target.WantCpus <= 1 || target.WantCpus is UNDEFINED) && (target.WantMemory < 1.7 || target.WantMemory is UNDEFINED) && (target.WantDisk < 160 || target.WantDisk is UNDEFINED); \
+    set_gridresource = "amazon"; \
+    set_amazonpublickey = "<path_to_AWS_public key>"; \
+    set_amazonprivatekey = "<path_to_AWS_private_key>"; \
+    set_amazonaccesskey = "<path_to_AWS_access_key>"; \
+    set_amazonsecretkey = "<path_to_AWS_secret_key"; \
+    set_rsapublickey = "<path_to_RSA_public_key>"; \
+    set_amazoninstancetype = "m1.small"; \
+    set_amazons3bucketname = "<S3_bucket_name>"; \
+    set_amazonsqsqueuename = "<SQS_queue_name>"; \
+    set_amazonamiid = "<EC2_AMI_ID>"; \
+    set_remote_jobuniverse = 5; \
+  ] \
+  [ GridResource = "condor localhost $(COLLECTOR_HOST)"; \
+    Name = "Amazon High-CPU Medium"; \
+    requirements=target.WantAWS is true && (target.Universe is vanilla || target.Universe is 5) && (target.WantArch is "INTEL" || target.WantArch is UNDEFINED) && ((target.WantCpus > 1 && target.WantCpus <= 5) || (target.WantDisk > 160 && target.WantDisk <= 350)); \
+    set_gridresource = "amazon"; \
+    set_amazonpublickey = "<path_to_AWS_public key>"; \
+    set_amazonprivatekey = "<path_to_AWS_private_key>"; \
+    set_amazonaccesskey = "<path_to_AWS_access_key>"; \
+    set_amazonsecretkey = "<path_to_AWS_secret_key"; \
+    set_rsapublickey = "<path_to_RSA_public_key>"; \
+    set_amazoninstancetype = "c1.medium"; \
+    set_amazons3bucketname = "<S3_bucket_name>"; \
+    set_amazonsqsqueuename = "<SQS_queue_name>"; \
+    set_amazonamiid = "<EC2_AMI_ID>"; \
+    set_remote_jobuniverse = 5; \
+  ] \
+  [ GridResource = "condor localhost $(COLLECTOR_HOST)"; \
+    Name = "Amazon High-CPU Extra Large"; \
+    requirements=target.WantAWS is true && (target.Universe is vanilla || target.Universe is 5) && target.WantArch is "X86_64" && target.WantCpus > 8 && target.WantCpus <= 20 && (target.WantMemory <= 7 || target.WantMemory is UNDEFINED) && (target.WantDisk <= 1690 || target.WantDisk is UNDEFINED); \
+    set_gridresource = "amazon"; \
+    set_amazonpublickey = "<path_to_AWS_public key>"; \
+    set_amazonprivatekey = "<path_to_AWS_private_key>"; \
+    set_amazonaccesskey = "<path_to_AWS_access_key>"; \
+    set_amazonsecretkey = "<path_to_AWS_secret_key"; \
+    set_rsapublickey = "<path_to_RSA_public_key>"; \
+    set_amazoninstancetype = "c1.xlarge"; \
+    set_amazons3bucketname = "<S3_bucket_name>"; \
+    set_amazonsqsqueuename = "<SQS_queue_name>"; \
+    set_amazonamiid = "<EC2_AMI_ID>"; \
+    set_remote_jobuniverse = 5; \
+  ] \
+  [ GridResource = "condor localhost $(COLLECTOR_HOST)"; \
+    Name = "Amazon XLarge"; \
+    requirements=target.WantAWS is true && (target.Universe is vanilla || target.Universe is 5) && target.WantArch is "X86_64" && ((target.WantMemory > 7.5 && target.WantMemory <= 15) || (target.WantDisk > 850 && target.WantDisk < 1690) || (target.WantCpus > 4 && target.WantCpus <= 8)); \
+    set_gridresource = "amazon"; \
+    set_amazonpublickey = "<path_to_AWS_public key>"; \
+    set_amazonprivatekey = "<path_to_AWS_private_key>"; \
+    set_amazonaccesskey = "<path_to_AWS_access_key>"; \
+    set_amazonsecretkey = "<path_to_AWS_secret_key"; \
+    set_rsapublickey = "<path_to_RSA_public_key>"; \
+    set_amazoninstancetype = "m1.xlarge"; \
+    set_amazons3bucketname = "<S3_bucket_name>"; \
+    set_amazonsqsqueuename = "<SQS_queue_name>"; \
+    set_amazonamiid = "<EC2_AMI_ID>"; \
+    set_remote_jobuniverse = 5; \
+  ] \
+  [ GridResource = "condor localhost $(COLLECTOR_HOST)"; \
+    Name = "Amazon Large"; \
+    requirements=target.WantAWS is true && (target.Universe is vanilla || target.Universe is 5) && target.WantArch is "X86_64" && (target.WantCpus <= 4 || target.WantCpus is UNDEFINED) && (target.WantMemory <= 7.5 || target.WantMemory is UNDEFINED) && (target.WantDisk <= 850 || target.WantDisk is UNDEFINED); \
+    set_gridresource = "amazon"; \
+    set_amazonpublickey = "<path_to_AWS_public key>"; \
+    set_amazonprivatekey = "<path_to_AWS_private_key>"; \
+    set_amazonaccesskey = "<path_to_AWS_access_key>"; \
+    set_amazonsecretkey = "<path_to_AWS_secret_key"; \
+    set_rsapublickey = "<path_to_RSA_public_key>"; \
+    set_amazoninstancetype = "m1.large"; \
+    set_amazons3bucketname = "<S3_bucket_name>"; \
+    set_amazonsqsqueuename = "<SQS_queue_name>"; \
+    set_amazonamiid = "<EC2_AMI_ID>"; \
+    set_remote_jobuniverse = 5; \
+  ]
+
+# Reminder: you must restart Condor for changes to DAEMON_LIST to take effect.
+DAEMON_LIST = $(DAEMON_LIST) JOB_ROUTER
+
+# For testing, set this to a small value to speed things up.
+# Once you are running at large scale, set it to a higher value
+# to prevent the JobRouter from using too much cpu.
+JOB_ROUTER_POLLING_PERIOD = 10
+
+# It is good to save lots of schedd queue history
+# for use with the router_history command.
+MAX_HISTORY_ROTATIONS = 20
+
+##--------------------------------------------------------------------
+##  Job Router Hooks Configuration
+##--------------------------------------------------------------------
+JOB_ROUTER.JOB_HOOK_KEYWORD = JROUTER
+JROUTER_HOOK_TRANSLATE_JOB = $(LOCAL_DIR)/hooks/hook_translate.py
+JROUTER_HOOK_UPDATE_JOB_INFO = $(LOCAL_DIR)/hooks/hook_retrieve_status.py
+JROUTER_HOOK_JOB_EXIT = $(LOCAL_DIR)/hooks/hook_job_finalize.py
+JROUTER_HOOK_JOB_CLEANUP = $(LOCAL_DIR)/hooks/hook_cleanup.py

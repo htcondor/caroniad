@@ -1,0 +1,86 @@
+#!/bin/bash
+#
+# caronia         This script allows for stopping and starting the ec2 enhanced
+#                 daemon caroniad.
+# chkconfig: - 91 11
+#
+# description: caroniad is the daemon that translates jobs between condor and
+#              Amazon's Web Services for use with condor's EC2 Enhanced
+#              feature.
+# processname: carod
+# config: /etc/opt/grid/caroniad.conf
+# pidfile: /var/run/caroniad.pid
+
+### BEGIN INIT INFO
+# Provides: caroniad
+# Required-Start: $local_fs $network condor
+# Required-Stop: $local_fs $network condor
+# Short-Description: start and stop caroniad
+# Description: AWS translation daemon
+### END INIT INFO
+
+# The program being managed
+prog=caroniad
+
+lockfile=/var/lock/subsys/$prog
+pidfile=/var/run/$prog.pid
+
+# Source function library
+. /etc/init.d/functions
+
+# Source networking configuration
+[ -f /etc/sysconfig/network ] && . /etc/sysconfig/network
+
+# Check that networking is up
+[ "${NETWORKING}" = "no" ] && exit 1
+
+start() {
+    echo -n $"Starting EC2-Enhanced daemon: "
+    daemon --pidfile $pidfile --check $prog $prog -p $pidfile --daemon
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && touch $lockfile
+    return $RETVAL
+}
+
+stop() {
+    echo -n $"Stopping EC2-Enhanced daemon: "
+    killproc -p $pidfile $prog
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && rm -f $lockfile
+    return $RETVAL
+}
+
+case "$1" in
+    start)
+        start
+        RETVAL=$?
+        ;;
+    stop)
+        stop
+        RETVAL=$?
+        ;;
+    restart)
+        stop
+        start
+        RETVAL=$?
+        ;;
+    condrestart)
+        RETVAL=0
+        if [ -f $lockfile ] ; then
+           stop
+           start
+           RETVAL=$?
+        fi
+        ;;
+    status)
+        status -p $pidfile $prog
+        RETVAL=$?
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|restart|condrestart|status}"
+        RETVAL=2
+esac
+
+exit $RETVAL

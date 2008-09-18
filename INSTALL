@@ -1,0 +1,83 @@
+Job Router Hooks
+
+Job Router Hooks allow for an alternate transformation and/or monitoring engine
+for the Job Router.  Routing is still controlled by the Job Router but if the
+Job Router Hooks are configured, then these hooks will be used to transform
+and monitor the job instead of Condor's internal engine.
+
+Job Router Hooks are similiar in concept to Job Hooks, but are limited
+in their scope to just the Job Router.  As with Job Hooks, a hook is an
+external program or script invoked by Condor's Job Router at various points
+during the lifecylce of a routed job.
+
+The following sections describe how these hooks are used by the Job Router,
+what hooks are invoked by Condor at various stages of the job's life, how
+to configure Condor to use Job Router Hooks, and how to write your own hooks.
+
+Overview of Job Router Hooks
+
+The Job Router Hooks allow for replacement of the tranformation engine used
+by Condor for routing a job.  Since the external transformation engine isn't
+controlled by Condor, additional hooks provide a means to update the job's
+status in Condor and clean up upon exit or failure cases.  This allows a job
+to be transformed to just about any other type of job that Condor supports, as
+well as to use execution nodes not normally available to Condor.
+
+It is important to note that if the Job Router Hooks are configured 
+then Condor will not ignore a failure in any hook execution.  If a hook
+is configured then Condor assumes it is required to execute and will not
+continue by falling back to a part of its internal engine.  For example,
+if there is a problem transforming the job using the hooks, Condor will
+not fall back on its internal transformation engine to process the job.
+
+Hooks Invoked by the Job Router
+
+There are 4 hooks that the Job Router can be configured to use.  Each
+hook will be described below along with data passed to the hook and expected
+output.  Again, all hooks must exit successfully.
+
+Hook: Translate
+
+HOOK_TRANSLATE is invoked when the Job Router has determined that a job
+meets the definition for a route.  This hook is responsible for doing the
+transformation of the job and configuring any resources that are external to
+Condor if applicable.
+
+Arguments: None.
+Standard Input: The first line will be the route that the job matched as
+defined in Condor's configuration files followed by the job ClassAd (separated
+by the string ------ and a new line).
+Expected Output: The transformed job.
+Exit Status: 0 for success, any non-zero value on failure.
+
+Hook: Update Job Info
+
+HOOK_UPDATE_JOB_INFO is invoked to provide status on the routed job when
+the Job Router polls the status of the routed jobs (JOB_ROUTER_POLLING_PERIOD).
+
+Arguments: None.
+Standard Input: The job ClassAd to be updated.
+Expected Output: The job ClassAd with updated fields, or nothing if no update.
+Exit Status: 0 for success, any non-zero value on failure.
+
+Hook: Job Finalize
+
+HOOK_JOB_FINALIZE is invoked when the Job Router has found that the job has
+completed.
+
+Arguments: The directory to place updated files, if applicable.
+Standard Input: The job ClassAd that completed.
+Expected Output: None.
+Exit Status: 0 for success, any non-zero value on failure.
+
+Hook: Job Cleanup
+
+HOOK_JOB_CLEANUP is invoked when the Job Router finishes managing the job.
+This hook will be invoked regardless of whether the job completes successfully
+or not.
+
+Arguments: None.
+Standard Input: The job ClassAd that the Job Router is done managing.
+Expected Output: None.
+Exit Status: 0 for success, any non-zero value on failure.
+

@@ -27,8 +27,8 @@ import getopt
 import tarfile
 import random
 from subprocess import *
-from mrg_hooks.functions import *
-from aws_common import *
+from jobhooks.functions import *
+from ec2enhanced.functions import *
 from boto.sqs.connection import SQSConnection
 from boto.sqs.message import Message
 from boto.s3.connection import S3Connection
@@ -173,6 +173,20 @@ class global_data(object):
       """Returns the total number of jobs currently running"""
       return(self.__total_jobs_running__)
 
+def shutdown_sockets(sock1, sock2):
+   if sock1 != None:
+      try:
+         sock1.shutdown(socket.SHUT_RDWR)
+      except:
+         pass
+      sock1.close()
+   if sock2 != None:
+      try:
+         sock2.shutdown(socket.SHUT_RDWR)
+      except:
+         pass
+      sock2.close()
+
 def time_monitor(msg_list, sock):
    """Monitors how long the system has been running.  If it is idle at
       around 60 minute intervals, it will shut down the system"""
@@ -287,8 +301,8 @@ def handle_get_work(req_socket, reply, queue, known_items, log):
          msg = pickle.loads(q_msg.get_body())
          reply.data = msg.class_ad
          job_run_time = grep('^JobLeaseDuration\s*=\s*(.+)$', reply.data)
-#         if job_run_time != None:
-#            q_msg.change_visibility(job_run_time[0])
+         if job_run_time != None:
+            q_msg.change_visibility(job_run_time[0])
       else:
          reply.data = ''
          req_socket.send(pickle.dumps(reply, 2))
@@ -658,7 +672,6 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
 
                result_ad += 'JobFinishedHookDone = ' + str(start_time + run_time) + '\n'
                results.class_ad = result_ad
-#               results.class_ad = msg.data
 
                # Upload the sandbox to S3
                s3_key.set_contents_from_filename(results_filename)
@@ -688,26 +701,64 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
 
 def main(argv=None):
    listen_socket = None
+   sock = None
    private_key_file = '/root/.ec2/rsa_key'
-#   private_key_file = '/home/rsquared/.ec2/private_key'
+   pidfile = ''
+   daemon_mode = 0
+
 
    if argv is None:
       argv = sys.argv
 
    try:
       try:
-         opts, args = getopt.getopt(argv[1:], 'dh', ['debug', 'help'])
+         opts, args = getopt.getopt(argv[1:], 'dlhp:', ['daemon', 'logdebug', 'help', 'pidfile='])
       except getopt.GetoptError, error:
         print str(error)
         return(FAILURE)
 
       debug_logging = False
       for option, arg in opts:
-         if option in ('-d', '--debug'):
+         if option in ('-d', '--daemon'):
+            daemon_mode = 1
+         if option in ('-l', '--logdebug'):
             debug_logging = True
          if option in ('-h', '--help'):
-            print 'usage: ' + os.path.basename(argv[0]) + ' [-d|--debug] [-h|--help]'
+            print 'usage: ' + os.path.basename(argv[0]) + ' [-d|--daemon] [-l|--logdebug] [-h|--help] [-p|--pidfile= <pidfile>]'
             return(SUCCESS)
+         if option in ('-p', '--pidfile'):
+            pidfile = arg
+
+      # Read the user data
+      user_data = get_instance_userdata()
+      if user_data == None:
+         # Send message about startup failure
+         raise general_exception(syslog.LOG_ERR, "No User Data")
+
+      if daemon_mode == 1:
+         try:
+            pid = os.fork()
+         except OSError, error:
+            raise general_exception(syslog.LOG_ERR, "%s [%d]" % (error.strerror, error.errno))
+         if pid == 0:
+            # Child thread.  Fork again to create the daemon
+            os.setsid()
+            try:
+               pid = os.fork()
+            except OSError, error:
+               raise general_exception(syslog.LOG_ERR, "%s [%d]" % (error.strerror, error.errno))
+            if pid == 0:
+               os.chdir('/')
+            else:
+               return(SUCCESS)
+         else:
+            return(SUCCESS)
+
+      # Create the pidfile
+      if pidfile != '':
+         file = open(pidfile, 'w')
+         file.write('%s\n' % str(os.getpid()))
+         file.close()
 
       # Open a connection to the system logger
       syslog.openlog(os.path.basename(argv[0]))
@@ -715,13 +766,7 @@ def main(argv=None):
       # Set signal handlers
       signal.signal(signal.SIGINT, exit_signal_handler)
 
-      # Read the user data and decrypt to get the access keys
-      user_data = get_instance_userdata()
-      if user_data == None:
-         # TODO: Send message about startup failure
-         print "No User Data"
-         return(FAILURE)
-
+      # Decrypt the user_data to get the access keys
       file = open('/root/data', 'w')
       file.writelines(user_data)
       file.close()
@@ -734,7 +779,7 @@ def main(argv=None):
       queue_name = data[2].rstrip()
 
       try:
-         sqs_config = read_config_file('/etc/opt/grid/daemon.conf', 'Daemon')
+         sqs_config = read_config_file('/etc/opt/grid/caroniad.conf', 'Daemon')
       except config_err, error:
          raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
 
@@ -809,23 +854,13 @@ def main(argv=None):
 
    except exit_signal, exit_data:
       # Close the session before exiting
-      if listen_socket != None:
-         try:
-            listen_socket.shutdown(socket.SHUT_RDWR)
-         except:
-            pass
-         listen_socket.close()
+      shutdown_sockets(listen_socket, sock)
       return(SUCCESS)
 
    except general_exception, error:
       log_messages(error)
       # Close the session before exiting
-      if listen_socket != None:
-         try:
-            listen_socket.shutdown(socket.SHUT_RDWR)
-         except:
-            pass
-         listen_socket.close()
+      shutdown_sockets(listen_socket, sock)
       return(FAILURE)
 
 if __name__ == '__main__':
