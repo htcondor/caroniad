@@ -69,7 +69,7 @@ def main(argv=None):
       if match != None and match[0] != None:
          aws_secret = match[0].rstrip()
          continue
-      match = grep('^amazonsqsqueuename\s*=\s*"(.+)"' line.lower())
+      match = grep('^amazonsqsqueuename\s*=\s*"(.+)"', line.lower())
       if match != None and match[0] != None:
          queue_name = match[0].rstrip()
          continue

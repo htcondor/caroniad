@@ -81,3 +81,12 @@ Standard Input: The job ClassAd that the Job Router is done managing.
 Expected Output: None.
 Exit Status: 0 for success, any non-zero value on failure.
 
+Configuring Condor to Use Job Router Hooks
+
+The following configuration defines all 4 Job Router hooks.
+
+# Job Router Hooks
+JOB_ROUTER_HOOK_TRANSLATE_JOB = /var/lib/condor/hooks/hook_translate.py
+JOB_ROUTER_HOOK_UPDATE_JOB_INFO = /var/lib/condor/hooks/hook_retrieve_status.py
+JOB_ROUTER_HOOK_JOB_EXIT = /var/lib/condor/hooks/hook_job_finalize.py
+JOB_ROUTER_HOOK_JOB_CLEANUP = /var/lib/condor/hooks/hook_cleanup.py
