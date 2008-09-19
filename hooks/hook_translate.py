@@ -48,7 +48,6 @@ def main(argv=None):
                         'numsystemholds', 'committedtime', 'totalsuspensions',
                         'lastsuspensiontime','cumulativesuspensiontime']
    float_reset_attribs = ['remoteusercpu', 'remotesyscpu']
-#   replace_attribs = ['err', 'userlog', 'out', 'transferoutput']
    transfer_attribs = ['cmd', 'command', 'in', 'transferinput']
    delim = '------'
    aws_key = ''
@@ -60,9 +59,7 @@ def main(argv=None):
    rsa_public_key = ''
 
    # Parse the route information from stdin.
-#   route = grep('^\[\s*(.*)\s*\]$', sys.stdin.readline())[0]
-   route_line = sys.stdin.readline()
-   route = grep('^\[\s*(.*)\s*\]$', route_line)[0]
+   route = grep('^\[\s*(.*)\s*\]$', sys.stdin.readline())[0]
    for line in route.split(';'):
       match = grep('^(.*)\s*=\s*"(.*)"$', line.lstrip())
       if match != None and match[0] != None and match[1] != None:
@@ -155,11 +152,6 @@ def main(argv=None):
             executable = value
       grid_classad += str(line)
 
-   file = open('classad.out', 'w')
-   file.writelines(route_line)
-   file.writelines(sqs_data.class_ad)
-   file.close()
-
    # Search through the class ad and make modifications to the files/paths
    # as necessary
    new_ad = ''
@@ -243,7 +235,6 @@ def main(argv=None):
 
    sqs_data.class_ad += 'AmazonAccessKey = "%s"\n' % str(aws_key_file)
    sqs_data.class_ad += 'AmazonSecretKey = "%s"\n' % str(aws_secret_file)
-   grid_classad += 'AmazonKeyPairFile = "/tmp/keypair-%s"\n' % str(os.getpid())
 
    # Pull the specific keys out of the files
    process = Popen(['cat', aws_key_file], stdout=PIPE)
@@ -295,7 +286,6 @@ def main(argv=None):
    # Put the original class ad into Amazon's SQS
    message = Message(body=pickle.dumps(sqs_data))
    sqs_con = SQSConnection(aws_key_val, aws_secret_val)
-#   sqs_queue_name = str(aws_key_val) + '-condor_work_queue'
    sqs_queue = sqs_con.create_queue(sqs_queue_name)
    sqs_queue.write(message)
    grid_classad += 'SQSMessageId = "' + str(message.id) + '"\n'

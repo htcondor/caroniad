@@ -45,9 +45,7 @@ def main(argv=None):
    s3_bucket_obj = ''
 
    # Read the class ad from stdin and store the S3 information
-   file = open('/home/rsquared/condor/installation/exit.out', 'w')
    for line in sys.stdin:
-      file.write(line)
       match = grep('^s3bucketid\s*=\s*"(.*)"$', line.lower())
       if match != None and match[0] != None:
          bucket = match[0].rstrip()
@@ -64,8 +62,6 @@ def main(argv=None):
       if match != None and match[0] != None:
          aws_secret = match[0].rstrip()
          continue
-
-   file.close()
 
    # Pull the specific keys out of the files
    process = Popen(['cat', aws_key], stdout=PIPE)

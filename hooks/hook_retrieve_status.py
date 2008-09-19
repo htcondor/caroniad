@@ -37,9 +37,7 @@ def main(argv=None):
    aws_key = ''
    aws_secret = ''
 
-   file = open('/home/rsquared/condor/installation/status.out', 'w')
    for line in sys.stdin:
-      file.write(line)
       request_classad += line
       match = re.match('^sqsmessageid\s*=\s*"(.+)"$', line.lower())
       if match != None and match.groups() != None:
@@ -53,8 +51,6 @@ def main(argv=None):
       if match != None and match.groups() != None:
          aws_secret = match.groups()[0].rstrip()
          continue
-
-   file.close()
 
    # Get the specified Amazon key information
    process = Popen(['cat', aws_key], stdout=PIPE)
@@ -86,10 +82,6 @@ def main(argv=None):
                key = grep('^S3KeyID\s*=.*$', status_classad)
                if s3_key != None and key == None:
                   status_classad += 'S3KeyID = "%s"\n' % s3_key
-
-#               job_iwd = grep('^Iwd\s*=\s*(.*)$', status_classad)
-#               if job_iwd != None and job_iwd[0] != None:
-#                  syslog.syslog(syslog.LOG_INFO, job_iwd[0])
 
                # Remove the key data if it exists
                key_file = grep('^AmazonUserDataFile\s*=\s*"(.*)"$', request_classad)

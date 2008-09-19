@@ -46,9 +46,7 @@ def main(argv=None):
    state = ''
 
    # Read the class ad from stdin and store the S3 information
-   file = open('/home/rsquared/condor/installation/cleanup.out', 'w')
    for line in sys.stdin:
-      file.write(line)
       match = grep('^s3bucketid\s*=\s*"(.+)"$', line.lower())
       if match != None and match[0] != None:
          bucket = match[0].rstrip()
@@ -84,7 +82,6 @@ def main(argv=None):
       match = grep('^amazonuserdatafile\s*=\s*"(.*)"$', line.lower())
       if match != None and match[0] != None:
          key_file = match[0].rstrip()
-   file.close()
 
    # Delete the file containing the encrypted keys if present
    if key_file != '' and os.path.exists(key_file):
