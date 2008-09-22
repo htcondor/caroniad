@@ -153,6 +153,9 @@ to
 
 # chkconfig: 2345
 
+Then execute chkconfig --del <package> and chkconfig --add <package> for
+each one, where <package> is either condor or caroniad.
+
 Package the AMI and configure the set_amazonamiid to the AMI ID once registered
 in EC2 for the route that the AMI should be used.
 
