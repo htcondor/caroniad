@@ -155,3 +155,42 @@ to
 
 Package the AMI and configure the set_amazonamiid to the AMI ID once registered
 in EC2 for the route that the AMI should be used.
+
+
+Using EC2 Enhanced
+
+A job that wants to use the EC2 Enhanced feature looks like any other vanilla
+universe job, however a few keys will need to be added to the submit file.
+Using the entries from the example condor_configuration file, the following
+submit file will cause the job to be routed to the Amazon Small route using
+the administrator defined credentials:
+
+universe = vanilla
+executable = /bin/date
+output = date.out
+log = ulog
+requirements = Arch == "INTEL" 
+should_transfer_files = yes
+when_to_transfer_output = on_exit
+transfer_executable = false 
++WantAWS = True
++WantArch = "INTEL" 
++WantCPUs = 1 queue
+
+It is important to note that it is likely that the Requirements attribute
+for the job will need to be set to match the hardware of the AMI the job will
+run on.  If the submit machine is X86_64 and the requirements are not
+specified, then the above job will not execute because the Amazon Small AMI
+type is 32-bit, not 64-bit.
+
+The submit file can provide user credentials for accessing EC2 if the site
+administrator has not configured credientials for that submit machine by
+adding the following entries to the submit file:
+
++AmazonAccessKey = "<path>/access_key"
++AmazonSecretKey = "<path>/secret_access_key"
++AmazonPublicKey = "<path>/cert.pem"
++AmazonPrivateKey = "<path>/pk.pem"
+
+These credentials will only be used if the submit machine does NOT have
+credentials defined in condor_config for the route that the job will use.
