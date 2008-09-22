@@ -86,7 +86,72 @@ Configuring Condor to Use Job Router Hooks
 The following configuration defines all 4 Job Router hooks.
 
 # Job Router Hooks
-JOB_ROUTER_HOOK_TRANSLATE_JOB = /var/lib/condor/hooks/hook_translate.py
-JOB_ROUTER_HOOK_UPDATE_JOB_INFO = /var/lib/condor/hooks/hook_retrieve_status.py
-JOB_ROUTER_HOOK_JOB_EXIT = /var/lib/condor/hooks/hook_job_finalize.py
-JOB_ROUTER_HOOK_JOB_CLEANUP = /var/lib/condor/hooks/hook_cleanup.py
+JOB_ROUTER_HOOK_TRANSLATE_JOB = $(LOCAL_DIR)/hooks/hook_translate.py
+JOB_ROUTER_HOOK_UPDATE_JOB_INFO = $(LOCAL_DIR)/hooks/hook_retrieve_status.py
+JOB_ROUTER_HOOK_JOB_EXIT = $(LOCAL_DIR)/hooks/hook_job_finalize.py
+JOB_ROUTER_HOOK_JOB_CLEANUP = $(LOCAL_DIR)/hooks/hook_cleanup.py
+
+
+
+Configuring the EC2 Enhanced Feature
+
+On the submit machine the ec2-enhanced-hooks RPM will need to be installed
+and condor figured to use the job router hooks installed.  A sample
+configuration file for the submit machine(s) that will enable the EC2 Enhanced
+Feature and allow routing for all EC2 AMI types is located at:
+
+/usr/share/doc/ec2-enhanced-hooks-1.0/example/condor_config.example
+
+
+On the EC2 AMI, the ec2-enhanced RPM will need to be installed, which will
+depend on Condor.  Condor needs to be configured to enable job hooks.  The
+following example configures the Job Hooks for EC2 Enhanced with a fetch
+interval of 10 seconds, and an update interval of 30 seconds:
+
+# Startd hooks
+EC2ENHANCED_HOOK_FETCH_WORK = $(LOCAL_DIR)/hooks/hook_fetch_work.py
+EC2ENHANCED_HOOK_REPLY_FETCH = $(LOCAL_DIR)/hooks/hook_reply_fetch.py
+
+# Starter hooks
+EC2ENHANCED_HOOK_PREPARE_JOB = $(LOCAL_DIR)/hooks/hook_prepare_job.py
+EC2ENHANCED_HOOK_UPDATE_JOB_INFO = $(LOCAL_DIR)/hooks/hook_update_job_status.py
+EC2ENHANCED_HOOK_JOB_EXIT = $(LOCAL_DIR)/hooks/hook_job_exit.py
+
+STARTD_JOB_HOOK_KEYWORD = EC2ENHANCED
+STARTER_JOB_HOOK_KEYWORD = EC2ENHANCED
+
+FetchWorkDelay = 10
+STARTER_UPDATE_INTERVAL = 30
+
+
+Next the caroniad daemon must be configured by editing:
+
+/etc/opt/grid/caroniad.conf
+
+ip - The IP address caroniad should listen on for communication with Condor.
+port - The port caroniad should listen on for communication with Condor.
+queued_connections - Number of outstanding connections.
+lease_time - Amount of time a job can run without an update of some kind.  No
+             update inferes there was a problem and the job will be released
+             and/or retried.
+lease_check_interval - How often to check for jobs with possible issues.
+
+
+Then edit the hook configuration file to communicate with caroniad:
+
+/etc/opt/grid/job-hooks.conf
+
+ip - The IP address the hooks should use to communicate with caroniad
+port - The port the hooks should use to communicate with caroniad
+
+Lastly configure condor and caroniad to start on boot time by editing their
+init files, changing:
+
+# chkconfig: -
+
+to 
+
+# chkconfig: 2345
+
+Package the AMI and configure the set_amazonamiid to the AMI ID once registered
+in EC2 for the route that the AMI should be used.
