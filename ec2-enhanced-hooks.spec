@@ -28,6 +28,7 @@ feature.
 %package common
 Summary: Common functions/utilties for condor job hooks
 Group: Applications/System
+BuildRequires: python-devel
 
 %description common
 Common functions and utilities used by MRG condor job hooks.
