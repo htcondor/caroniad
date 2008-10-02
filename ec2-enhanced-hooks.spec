@@ -37,11 +37,11 @@ Common functions and utilities used by MRG condor job hooks.
 %setup -q
 
 %install
-mkdir -p %{buildroot}/%_var/lib/condor/hooks
+mkdir -p %{buildroot}/%_libexecdir/condor/hooks
 mkdir -p %{buildroot}/%{python_sitelib}/ec2enhanced
 mkdir -p %{buildroot}/%_sysconfdir/opt/grid
 mkdir -p %{_builddir}/%{name}-%{version}/example
-cp -f hook*.py %{buildroot}/%_var/lib/condor/hooks
+cp -f hook*.py %{buildroot}/%_libexecdir/condor/hooks
 cp -f functions.py %{buildroot}/%{python_sitelib}/ec2enhanced
 cp -f config/condor_config.example %{_builddir}/%{name}-%{version}/example
 touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
@@ -50,10 +50,10 @@ touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt INSTALL example
 %defattr(0555,root,root,-)
-%_var/lib/condor/hooks/hook_job_finalize.py*
-%_var/lib/condor/hooks/hook_translate.py*
-%_var/lib/condor/hooks/hook_cleanup.py*
-%_var/lib/condor/hooks/hook_retrieve_status.py*
+%_libexecdir/condor/hooks/hook_job_finalize.py*
+%_libexecdir/condor/hooks/hook_translate.py*
+%_libexecdir/condor/hooks/hook_cleanup.py*
+%_libexecdir/condor/hooks/hook_retrieve_status.py*
 
 %files common
 %{python_sitelib}/ec2enhanced/functions.py*
