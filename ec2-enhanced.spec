@@ -14,6 +14,11 @@ Requires: condor-job-hooks-common
 Requires: ec2-enhanced-hooks-common
 Requires: python-boto >= 1.0a
 
+Requires(post):/sbin/chkconfig
+Requires(preun):/sbin/chkconfig
+Requires(preun):/sbin/service
+Requires(postun):/sbin/service
+
 %description
 The EC2 Enhanced feature allows for near seamless translation of Condor jobs
 in the standard universe to condor EC2 jobs in the grid universe.  For all
@@ -35,6 +40,20 @@ mkdir -p %{buildroot}/%{_initrddir}
 cp -f caroniad %{buildroot}/%_sbindir
 cp -f config/caroniad.conf %{buildroot}/%{_sysconfdir}/opt/grid
 cp -f config/caronia.init %{buildroot}/%{_initrddir}/caronia
+
+%post
+/sbin/chkconfig --add caronia
+
+%preun
+if [ $1 = 0 ]; then
+  /sbin/service caronia stop >/dev/null 2>&1 || :
+  /sbin/chkconfig --del caronia
+fi
+
+%postun
+if [ "$1" -ge "1" ]; then
+  /sbin/service caronia condrestart >/dev/null 2>&1 || :
+fi
 
 %files
 %defattr(-,root,root,-)
