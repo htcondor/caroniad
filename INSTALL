@@ -86,10 +86,10 @@ Configuring Condor to Use Job Router Hooks
 The following configuration defines all 4 Job Router hooks.
 
 # Job Router Hooks
-JOB_ROUTER_HOOK_TRANSLATE_JOB = $(LOCAL_DIR)/hooks/hook_translate.py
-JOB_ROUTER_HOOK_UPDATE_JOB_INFO = $(LOCAL_DIR)/hooks/hook_retrieve_status.py
-JOB_ROUTER_HOOK_JOB_EXIT = $(LOCAL_DIR)/hooks/hook_job_finalize.py
-JOB_ROUTER_HOOK_JOB_CLEANUP = $(LOCAL_DIR)/hooks/hook_cleanup.py
+JOB_ROUTER_HOOK_TRANSLATE_JOB = $(LIBEXEC)/hooks/hook_translate.py
+JOB_ROUTER_HOOK_UPDATE_JOB_INFO = $(LIBEXEC)/hooks/hook_retrieve_status.py
+JOB_ROUTER_HOOK_JOB_EXIT = $(LIBEXEC)/hooks/hook_job_finalize.py
+JOB_ROUTER_HOOK_JOB_CLEANUP = $(LIBEXEC)/hooks/hook_cleanup.py
 
 
 
@@ -109,13 +109,13 @@ following example configures the Job Hooks for EC2 Enhanced with a fetch
 interval of 10 seconds, and an update interval of 30 seconds:
 
 # Startd hooks
-EC2ENHANCED_HOOK_FETCH_WORK = $(LOCAL_DIR)/hooks/hook_fetch_work.py
-EC2ENHANCED_HOOK_REPLY_FETCH = $(LOCAL_DIR)/hooks/hook_reply_fetch.py
+EC2ENHANCED_HOOK_FETCH_WORK = $(LIBEXEC)/hooks/hook_fetch_work.py
+EC2ENHANCED_HOOK_REPLY_FETCH = $(LIBEXEC)/hooks/hook_reply_fetch.py
 
 # Starter hooks
-EC2ENHANCED_HOOK_PREPARE_JOB = $(LOCAL_DIR)/hooks/hook_prepare_job.py
-EC2ENHANCED_HOOK_UPDATE_JOB_INFO = $(LOCAL_DIR)/hooks/hook_update_job_status.py
-EC2ENHANCED_HOOK_JOB_EXIT = $(LOCAL_DIR)/hooks/hook_job_exit.py
+EC2ENHANCED_HOOK_PREPARE_JOB = $(LIBEXEC)/hooks/hook_prepare_job.py
+EC2ENHANCED_HOOK_UPDATE_JOB_INFO = $(LIBEXEC)/hooks/hook_update_job_status.py
+EC2ENHANCED_HOOK_JOB_EXIT = $(LIBEXEC)/hooks/hook_job_exit.py
 
 STARTD_JOB_HOOK_KEYWORD = EC2ENHANCED
 STARTER_JOB_HOOK_KEYWORD = EC2ENHANCED
@@ -178,13 +178,45 @@ when_to_transfer_output = on_exit
 transfer_executable = false 
 +WantAWS = True
 +WantArch = "INTEL" 
-+WantCPUs = 1 queue
++WantCPUs = 1
+queue
 
 It is important to note that it is likely that the Requirements attribute
 for the job will need to be set to match the hardware of the AMI the job will
 run on.  If the submit machine is X86_64 and the requirements are not
 specified, then the above job will not execute because the Amazon Small AMI
 type is 32-bit, not 64-bit.
+
+The following fields can be defined, where applicable, to aid in routing the
+job to the proper AMI.  If only WantAWS is defined, then the job will be routed
+to the small AMI type.
+
+WantAWS 
+    Values: True/False.
+
+    Designates that the job wants to use EC2 for execution.  Defaults to False.
+
+WantArch
+    Values: "INTEL"/"X86_64"
+
+    Designates the architecture desired for the job.  Defaults to INTEL.
+
+WantCpus
+    Values: Integer
+
+    Designates the number of CPUs desired for the job.
+
+WantMemory
+    Values: Float
+
+    Designates the amount of RAM desired for the job.  Value is in Gigabytes,
+    so 1 == 1 Gigabyte.
+
+WantDisk
+    Values: Integer
+
+    Designates the amount of Disk space desired for the job.  Value is in in
+    Gigabytes, so 100 == 100 Gigabytes of disk space.
 
 The submit file can provide user credentials for accessing EC2 if the site
 administrator has not configured credientials for that submit machine by
@@ -194,6 +226,7 @@ adding the following entries to the submit file:
 +AmazonSecretKey = "<path>/secret_access_key"
 +AmazonPublicKey = "<path>/cert.pem"
 +AmazonPrivateKey = "<path>/pk.pem"
++RSAPublicKey = "<path>/rsa_key.pub"
 
 These credentials will only be used if the submit machine does NOT have
 credentials defined in condor_config for the route that the job will use.
