@@ -196,16 +196,13 @@ def time_monitor(msg_list, sock):
    process = Popen(['cat', '/proc/uptime'], stdout=PIPE)
    uptime = int(round(float(process.communicate()[0].rstrip().split()[0])))
    time_from_next_hour = int(round(float((uptime % 3600)/60)))
-   print time_from_next_hour
    while True:
       if first_time == 1:
          first_time = 0
          sleep_time = int(3600 - ((time_from_next_hour+1)*60))
       else:
          sleep_time = 3600
-      print "sleeping for %d seconds" % sleep_time
       time.sleep(int(sleep_time))
-      print msg_list.get_total_jobs_running()
       if msg_list.get_total_jobs_running() < 1:
          # No jobs are being processed, so close the socket and shutdown
          try:
@@ -319,6 +316,11 @@ def handle_get_work(req_socket, reply, queue, known_items, log):
             if match[0].rstrip().lower() in remove_attribs:
                continue
 
+            if match[0].rstrip().lower() == 'owner':
+               ad += '%s = "condor"\n' % match[0].rstrip()
+               ad += 'EC2OrigOwner = %s\n' % match[1].rstrip()
+               continue
+
             # Check the file paths
             if match[1] != None and match[0].rstrip().lower() in file_attribs:
                paths = grep ('^"(.+)"$', match[1])
@@ -375,7 +377,7 @@ def handle_reply_fetch(msg, queue, known_items, log):
    if log == True:
       print '%s called at %s' % (func_name, str(time.localtime()))
 
-   remove_attribs = ['iwd']
+   remove_attribs = ['iwd', 'owner']
 
    try:
       # Find the SQSMessageId in the message received
@@ -403,14 +405,22 @@ def handle_reply_fetch(msg, queue, known_items, log):
             # to remove some attributes that shouldn't have updated data
             # sent to the submitter.
             result_ad = ''
+            orig_owner = ''
             for line in msg.data.split('\n'):
-               match = grep('^(.*)\s*=.*$', line)
+               match = grep('^(.*)\s*=\s*(.+)$', line)
                if re.match('---', line) != None:
                   break
                elif match != None and match[0] != None:
                   if match[0].rstrip().lower() in remove_attribs:
                      continue
+                  elif match[0].rstrip() == 'JobStatus':
+                     result_ad += 'JobStatus = 2\n'
+                     continue
+                  elif match[0].rstrip() == 'EC2OrigOwner':
+                     orig_owner = match[1].rstrip()
+                     continue
                result_ad += line + "\n"
+            result_ad += 'Owner = %s\n' % orig_owner
 
             response = pickle.loads(saved_work.SQS_msg.get_body())
             response.class_ad = result_ad
@@ -496,7 +506,7 @@ def handle_update_job_status(msg, queue, known_items, log):
    if log == True:
       print '%s called at %s' % (func_name, str(time.localtime()))
 
-   remove_attribs = ['iwd']
+   remove_attribs = ['iwd', 'owner']
 
    try:
       # Find the SQSMessageId in the message received
@@ -521,14 +531,18 @@ def handle_update_job_status(msg, queue, known_items, log):
             # appropriate state, so change it to say the job is running(2).
             result_ad = ''
             for line in msg.data.split('\n'):
-               match = grep('^(.*)\s*=.*$', line)
+               match = grep('^(.*)\s*=\s*(.+)$', line)
                if match != None and match[0] != None:
                   if match[0].rstrip().lower() in remove_attribs:
                      continue
                   elif match[0].rstrip() == 'JobStatus':
                      result_ad += 'JobStatus = 2\n'
                      continue
+                  elif match[0].rstrip() == 'EC2OrigOwner':
+                     orig_owner = match[1].rstrip()
+                     continue
                result_ad += line + "\n"
+            result_ad += 'Owner = %s\n' % orig_owner
 
             response = pickle.loads(saved_work.SQS_msg.get_body())
             response.class_ad = result_ad
@@ -557,7 +571,7 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
 
    transfer_file_attribs = ['Err', 'Out', 'TransferOutput']
    file_list = []
-   remove_attribs = ['iwd']
+   remove_attribs = ['iwd', 'owner']
 
    try:
       # Determine the slot that is reporting results
@@ -620,14 +634,17 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
                   for file in match[0].split(','):
                      if file not in file_list:
                         # Only add the file to the list if wasn't there already
-                        file_list += file
+                        file_list.append(file)
 
             # Archive all the important files
             results_filename = work_cwd + '/results.tar.gz'
             results_file = tarfile.open(results_filename, 'w:gz')
             for file in file_list:
                if os.path.exists(file.rstrip()):
-                  if os.path.dirname(file.rstrip()) != '':
+                  # Only parse the dir/file path if it actually is a dir/file
+                  # format (ie doesn't end in /)
+                  if os.path.dirname(file.rstrip()) != '' and \
+                     os.path.basename(file.rstrip()) != '':
                      os.chdir(os.path.dirname(file.rstrip()))
                      results_file.add(os.path.basename(file.rstrip()))
                      os.chdir(work_cwd)
@@ -642,23 +659,27 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
                if log == True:
                   print '%s: Normal exit' % func_name
 
-               # The Class Ad we have don't reflect the appropriate state, so 
+               # The Class Ad we have doesn't reflect the appropriate state, so 
                # change it to say the job is completed(4).  Also remove
                # attributes that shouldn't have updated data sent to the
                # originater.
                result_ad = ''
                start_time = 0
                run_time = 0
+               orig_owner = ''
                for line in msg.data.split('\n'):
-                  match = grep('^(.*)\s*=.*$', line)
-                  if re.match('JobStatus', line) != None:
-                     result_ad += 'JobStatus = 4\n'
-                  else:
-                     if match != None and match[0] != None:
-                        if match[0].rstrip().lower() in remove_attribs:
-                           continue
-                     if line != '':
-                        result_ad += line + "\n"
+                  match = grep('^(.*)\s*=\s*(.+)$', line)
+                  if match != None and match[0] != None:
+                     if re.match('JobStatus', line) != None:
+                        result_ad += 'JobStatus = 4\n'
+                        continue
+                     elif match[0].rstrip().lower() in remove_attribs:
+                        continue
+                     elif match[0].rstrip() == 'EC2OrigOwner':
+                        orig_owner = match[1].rstrip()
+                        continue
+                  if line != '':
+                     result_ad += line + "\n"
 
                   # Set the job completion time by finding the start time and
                   # job duration from the class ad and add them together.
@@ -670,6 +691,7 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
                   if match != None and match.groups() != None:
                      run_time = int(round(float(match.groups()[0])))
 
+               result_ad += 'Owner = %s\n' % orig_owner
                result_ad += 'JobFinishedHookDone = ' + str(start_time + run_time) + '\n'
                results.class_ad = result_ad
 
@@ -705,7 +727,6 @@ def main(argv=None):
    private_key_file = '/root/.ec2/rsa_key'
    pidfile = ''
    daemon_mode = 0
-
 
    if argv is None:
       argv = sys.argv

@@ -27,7 +27,7 @@ from boto.s3.key import Key
 from boto.sqs.connection import SQSConnection
 from boto.sqs.message import Message
 from boto.exception import *
-from jobhooks.functions import SQSEntry
+from jobhooks.functions import *
 from ec2enhanced.functions import *
 
 def main(argv=None):

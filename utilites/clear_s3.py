@@ -11,8 +11,8 @@ import tarfile
 from subprocess import *
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
-from aws_common import SQSEntry
-from workfetch_common import *
+from ec2enhanced.functions import SQSEntry
+from jobhooks.functions import *
 
 # Read the Amazon AWS information from condor_config
 process = Popen(['cat', '/home/rsquared/.ec2/access_key'], stdout=PIPE)

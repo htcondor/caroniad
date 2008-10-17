@@ -122,13 +122,13 @@ def main(argv=None):
             if rsa_public_key == '':
                user_rsa_public_key = grep('^"(.*)"$', value)[0]
             continue
+         if attribute.lower() in skip_attribs:
+            continue
          sqs_data.class_ad += str(line)
 
          if attribute.lower() == 'jobuniverse':
             grid_classad += 'JobUniverse = 9\n'
             grid_classad += 'Remote_JobUniverse = ' + str(value) + '\n'
-            continue
-         if attribute.lower() in skip_attribs:
             continue
          if attribute.lower() in int_reset_attribs:
             grid_classad += attribute + ' = 0\n'
@@ -170,7 +170,7 @@ def main(argv=None):
          # the '/' character.  If a / exists, it's a file with a full path
          match = re.match('^"(.*)"$', value)
          if match != None and match.groups() != None:
-            split_val = match.groups()[0].rpartition('/')
+            split_val = os.path.split(match.groups()[0])
 
          # Replace these attributes in the job class ad or the AMI instance
          # will fail.  Need to remove any reference to directories so all
@@ -184,10 +184,10 @@ def main(argv=None):
                new_ad += line + '\n'
                continue
             if split_val[0] == '':
-               files.append(iwd + ' = ' + match.groups()[0].rstrip() + '\n')
+               files.append(iwd + '/' + match.groups()[0].rstrip() + '\n')
             else:
                files.append(match.groups()[0].rstrip() + '\n')
-            new_ad += attribute + ' = "' + split_val[2].rstrip() + '"\n'
+            new_ad += attribute + ' = "' + split_val[1].rstrip() + '"\n'
             continue
          new_ad += line + '\n'
    sqs_data.class_ad = new_ad
@@ -270,7 +270,7 @@ def main(argv=None):
       for file in files:
          tar_obj = data_files.gettarinfo(file.rstrip())
          file_obj = open(file.rstrip())
-         tar_obj.name = tar_obj.name.rpartition('/')[2]
+         tar_obj.name = os.path.basename(tar_obj.name)
          data_files.addfile(tar_obj, file_obj)
          file_obj.close()
       data_files.close()

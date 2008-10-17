@@ -15,9 +15,12 @@ aws_secret_val = process.communicate()[0].rstrip()
 conn = SQSConnection(aws_key_val, aws_secret_val)
 queues = conn.get_all_queues()
 for queue in queues:
+   print queue.url
+#   print queue.get_attributes()
    m = queue.read(10)
    while m != None:
       print pickle.loads(m.get_body()).class_ad
+      print
       queue.delete_message(m)
       m = queue.read(10)
-#   conn.delete_queue(queue)
+   conn.delete_queue(queue)
