@@ -108,7 +108,7 @@ MAX_HISTORY_ROTATIONS = 20
 ##--------------------------------------------------------------------
 ##  Job Router Hooks Configuration
 ##--------------------------------------------------------------------
-JOB_ROUTER_HOOK_TRANSLATE_JOB = $(LOCAL_DIR)/hooks/hook_translate.py
-JOB_ROUTER_HOOK_UPDATE_JOB_INFO = $(LOCAL_DIR)/hooks/hook_retrieve_status.py
-JOB_ROUTER_HOOK_JOB_EXIT = $(LOCAL_DIR)/hooks/hook_job_finalize.py
-JOB_ROUTER_HOOK_JOB_CLEANUP = $(LOCAL_DIR)/hooks/hook_cleanup.py
+JOB_ROUTER_HOOK_TRANSLATE_JOB = $(LIBEXEC)/hooks/hook_translate.py
+JOB_ROUTER_HOOK_UPDATE_JOB_INFO = $(LIBEXEC)/hooks/hook_retrieve_status.py
+JOB_ROUTER_HOOK_JOB_EXIT = $(LIBEXEC)/hooks/hook_job_finalize.py
+JOB_ROUTER_HOOK_JOB_CLEANUP = $(LIBEXEC)/hooks/hook_cleanup.py
