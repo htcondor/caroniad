@@ -1,5 +1,5 @@
 Summary: EC2 Enhanced
-Name: ec2-enhanced
+Name: condor-ec2-enhanced
 Version: 1.0
 Release: 1%{?dist}
 License: ASL 2.0
@@ -11,7 +11,7 @@ Requires: python >= 2.4
 Requires: condor >= 7.0.2-4
 Requires: condor-job-hooks
 Requires: condor-job-hooks-common
-Requires: ec2-enhanced-hooks-common
+Requires: condor-ec2-enhanced-hooks-common
 Requires: python-boto >= 1.0a
 
 Requires(post):/sbin/chkconfig
