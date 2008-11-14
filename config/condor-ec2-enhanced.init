@@ -1,13 +1,13 @@
 #!/bin/bash
 #
-# caronia         This script allows for stopping and starting the ec2 enhanced
-#                 daemon caroniad.
+# condor-ec2-enhanced   This script allows for stopping and starting the condor
+#                       ec2 enhanced daemon caroniad.
 # chkconfig: - 91 11
 #
 # description: caroniad is the daemon that translates jobs between condor and
 #              Amazon's Web Services for use with condor's EC2 Enhanced
 #              feature.
-# processname: carod
+# processname: caroniad
 # config: /etc/opt/grid/caroniad.conf
 # pidfile: /var/run/caroniad.pid
 
@@ -66,6 +66,11 @@ case "$1" in
         start
         RETVAL=$?
         ;;
+    reload)
+        stop
+        start
+        RETVAL=$?
+        ;;
     condrestart)
         RETVAL=0
         if [ -f $lockfile ] ; then
@@ -79,7 +84,7 @@ case "$1" in
         RETVAL=$?
         ;;
     *)
-        echo $"Usage: $0 {start|stop|restart|condrestart|status}"
+        echo $"Usage: $0 {start|stop|restart|reload|condrestart|status}"
         RETVAL=2
 esac
 

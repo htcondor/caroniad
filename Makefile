@@ -45,13 +45,13 @@ SOURCES/${EC2EHOOKS_SOURCE}: hooks/functions.py hooks/hook_cleanup.py \
 	tar -cf ${EC2EHOOKS_SOURCE} ${EC2EHOOKS_DIR}
 	mv "${EC2EHOOKS_SOURCE}" SOURCES
 
-SOURCES/${EC2E_SOURCE}: caroniad config/caroniad.conf config/caronia.init
+SOURCES/${EC2E_SOURCE}: caroniad config/caroniad.conf config/condor-ec2-enhanced.init
 	mkdir -p SOURCES
 	rm -rf ${EC2E_DIR}
 	mkdir ${EC2E_DIR}
 	mkdir ${EC2E_DIR}/config
 	cp -f caroniad ${EC2E_DIR}
-	cp -f config/caroniad.conf config/caronia.init ${EC2E_DIR}/config
+	cp -f config/caroniad.conf config/condor-ec2-enhanced.init ${EC2E_DIR}/config
 	cp -f LICENSE-2.0.txt ${EC2E_DIR}
 	tar -cf ${EC2E_SOURCE} ${EC2E_DIR}
 	mv "${EC2E_SOURCE}" SOURCES

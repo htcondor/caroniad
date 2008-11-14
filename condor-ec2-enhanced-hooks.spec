@@ -3,9 +3,10 @@
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
 Version: 1.0
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: ASL 2.0
 Group: Applications/System
+URL: http://www.redhat.com/mrg
 Source0: %{name}-%{version}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
@@ -27,7 +28,7 @@ on condor nodes that will submitting work and wish to use the EC2 Enhanced
 feature.
 
 %package common
-Summary: Common functions/utilties for condor job hooks
+Summary: Common functions/utilities for condor job hooks
 Group: Applications/System
 BuildRequires: python-devel
 
@@ -50,12 +51,22 @@ touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
 %files
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt INSTALL example
-%defattr(0555,root,root,-)
+%defattr(0755,root,root,-)
 %_libexecdir/condor/hooks/hook_job_finalize.py*
 %_libexecdir/condor/hooks/hook_translate.py*
 %_libexecdir/condor/hooks/hook_cleanup.py*
 %_libexecdir/condor/hooks/hook_retrieve_status.py*
 
 %files common
+%defattr(-,root,root,-)
+%doc LICENSE-2.0.txt INSTALL example
 %{python_sitelib}/ec2enhanced/functions.py*
 %{python_sitelib}/ec2enhanced/__init__.py*
+
+%changelog
+* Fri Nov  4 2008  <rrati@redhat> - 1.0-2
+- Add changelog
+- Fix rpmlint issues
+
+* Fri Nov  4 2008  <rrati@redhat> - 1.0-1
+- Initial packaging

@@ -1,9 +1,10 @@
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
 Version: 1.0
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: ASL 2.0
 Group: Applications/System
+URL: http://www.redhat.com/mrg
 Source0: %{name}-%{version}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
@@ -39,26 +40,35 @@ mkdir -p %{buildroot}/%{_sysconfdir}/opt/grid
 mkdir -p %{buildroot}/%{_initrddir}
 cp -f caroniad %{buildroot}/%_sbindir
 cp -f config/caroniad.conf %{buildroot}/%{_sysconfdir}/opt/grid
-cp -f config/caronia.init %{buildroot}/%{_initrddir}/caronia
+cp -f config/condor-ec2-enhanced.init %{buildroot}/%{_initrddir}/condor-ec2-enhanced
 
 %post
-/sbin/chkconfig --add caronia
+/sbin/chkconfig --add condor-ec2-enhanced
 
 %preun
 if [ $1 = 0 ]; then
-  /sbin/service caronia stop >/dev/null 2>&1 || :
-  /sbin/chkconfig --del caronia
+  /sbin/service condor-ec2-enhanced stop >/dev/null 2>&1 || :
+  /sbin/chkconfig --del condor-ec2-enhanced
 fi
 
 %postun
 if [ "$1" -ge "1" ]; then
-  /sbin/service caronia condrestart >/dev/null 2>&1 || :
+  /sbin/service condor-ec2-enhanced condrestart >/dev/null 2>&1 || :
 fi
 
 %files
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt
 %config(noreplace) %_sysconfdir/opt/grid/caroniad.conf
-%attr(0755,root,root) %_initrddir/caronia
-%defattr(0555,root,root,-)
+%defattr(0755,root,root,-)
+%_initrddir/condor-ec2-enhanced
 %_sbindir/caroniad
+
+%changelog
+* Fri Nov  4 2008  <rrati@redhat> - 1.0-2
+- Add changelog
+- Fix rpmlint issues
+- Changed init script to condor-ec2-enhanced
+
+* Fri Nov  4 2008  <rrati@redhat> - 1.0-1
+- Initial packaging
