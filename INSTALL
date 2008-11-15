@@ -137,7 +137,8 @@ port - The port caroniad should listen on for communication with Condor.
 queued_connections - Number of outstanding connections.
 lease_time - Amount of time a job can run without an update of some kind.  No
              update inferes there was a problem and the job will be released
-             and/or retried.
+             and/or retried.  This value must be larger than what is set for
+             STARTER_UPDATE_INTERVAL.
 lease_check_interval - How often to check for jobs with possible issues.
 
 
