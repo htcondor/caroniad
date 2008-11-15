@@ -3,7 +3,7 @@
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
 Version: 1.0
-Release: 2%{?dist}
+Release: 3%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -59,11 +59,15 @@ touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
 
 %files common
 %defattr(-,root,root,-)
-%doc LICENSE-2.0.txt INSTALL example
+%doc LICENSE-2.0.txt
 %{python_sitelib}/ec2enhanced/functions.py*
 %{python_sitelib}/ec2enhanced/__init__.py*
 
 %changelog
+* Fri Nov  4 2008  <rrati@redhat> - 1.0-3
+- Removed INSTALL and example from the common package
+- Updated INSTALL to mention RSA Private Key file
+
 * Fri Nov  4 2008  <rrati@redhat> - 1.0-2
 - Add changelog
 - Fix rpmlint issues

@@ -123,6 +123,10 @@ STARTER_JOB_HOOK_KEYWORD = EC2ENHANCED
 FetchWorkDelay = 10
 STARTER_UPDATE_INTERVAL = 30
 
+An RSA private key needs to be stored in '/root/.ec2/rsa_key" on the AMI.
+This key must be able to decrypt data encrypted with the RSA public key
+provided in a route's configuration (set_rsapublickey) or in the
+job's submit file (+RSAPublicKey).
 
 Next the caroniad daemon must be configured by editing:
 
