@@ -2,7 +2,7 @@
 #
 # condor-ec2-enhanced   This script allows for stopping and starting the condor
 #                       ec2 enhanced daemon caroniad.
-# chkconfig: - 91 11
+# chkconfig: 2345 91 11
 #
 # description: caroniad is the daemon that translates jobs between condor and
 #              Amazon's Web Services for use with condor's EC2 Enhanced

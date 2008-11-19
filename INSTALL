@@ -141,7 +141,6 @@ lease_time - Amount of time a job can run without an update of some kind.  No
              STARTER_UPDATE_INTERVAL.
 lease_check_interval - How often to check for jobs with possible issues.
 
-
 Then edit the hook configuration file to communicate with caroniad:
 
 /etc/opt/grid/job-hooks.conf

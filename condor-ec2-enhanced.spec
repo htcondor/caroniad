@@ -1,7 +1,7 @@
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
 Version: 1.0
-Release: 2%{?dist}
+Release: 3%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -65,6 +65,9 @@ fi
 %_sbindir/caroniad
 
 %changelog
+* Wed Nov 10 2008  <rrati@redhat> - 1.0-3
+- Daemon is on by default
+
 * Fri Nov  4 2008  <rrati@redhat> - 1.0-2
 - Add changelog
 - Fix rpmlint issues
