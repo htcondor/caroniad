@@ -25,7 +25,7 @@ s3_con = S3Connection(aws_key_val, aws_secret_val)
 buckets = s3_con.get_all_buckets()
 for bucket in buckets:
    print "Examining bucket: " + bucket.name
-   if bucket.name == "ec2_enhanced":
+   if bucket.name == "xerox_beta":
       continue
    s3_bucket = s3_con.get_bucket(bucket.name)
    for s3_key in s3_bucket.list():

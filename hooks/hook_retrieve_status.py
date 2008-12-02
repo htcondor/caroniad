@@ -39,17 +39,18 @@ def main(argv=None):
 
    for line in sys.stdin:
       request_classad += line
-      match = re.match('^sqsmessageid\s*=\s*"(.+)"$', line.lower())
-      if match != None and match.groups() != None:
-         sqs_msg_id = match.groups()[0].rstrip()
+      match = grep('^(.*)\s*=\s*"(.*)"$', line.lstrip())
+      if match != None and match[0] != None and match[1] != None:
+         attribute = match[0].rstrip()
+         value = match[1].rstrip()
+      if attribute.lower() == 'sqsmessageid':
+         sqs_msg_id = value
          continue
-      match = re.match('^amazonaccesskey\s*=\s*"(.+)"$', line.lower())
-      if match != None and match.groups() != None:
-         aws_key = match.groups()[0].rstrip()
+      if attribute.lower() == 'amazonaccesskey':
+         aws_key = value
          continue
-      match = re.match('^amazonsecretkey\s*=\s*"(.+)"$', line.lower())
-      if match != None and match.groups() != None:
-         aws_secret = match.groups()[0].rstrip()
+      if attribute.lower() == 'amazonsecretkey':
+         aws_secret = value
          continue
 
    # Get the specified Amazon key information

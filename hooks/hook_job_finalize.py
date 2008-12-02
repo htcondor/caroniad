@@ -46,21 +46,21 @@ def main(argv=None):
 
    # Read the class ad from stdin and store the S3 information
    for line in sys.stdin:
-      match = grep('^s3bucketid\s*=\s*"(.*)"$', line.lower())
-      if match != None and match[0] != None:
-         bucket = match[0].rstrip()
+      match = grep('^(.*)\s*=\s*"(.*)"$', line.lstrip())
+      if match != None and match[0] != None and match[1] != None:
+         attribute = match[0].rstrip()
+         value = match[1].rstrip()
+      if attribute.lower() == 's3bucketid':
+         bucket = value
          continue
-      match = grep('^s3keyid\s*=\s*"(.*)"$', line.lower())
-      if match != None and match[0] != None:
-         key = match[0].rstrip()
+      if attribute.lower() == 's3keyid':
+         key = value
          continue
-      match = grep('^amazonaccesskey\s*=\s*"(.+)"$', line.lower())
-      if match != None and match[0] != None:
-         aws_key = match[0].rstrip()
+      if attribute.lower() == 'amazonaccesskey':
+         aws_key = value
          continue
-      match = grep('^amazonsecretkey\s*=\s*"(.+)"$', line.lower())
-      if match != None and match[0] != None:
-         aws_secret = match[0].rstrip()
+      if attribute.lower() == 'amazonsecretkey':
+         aws_secret = value
          continue
 
    # Pull the specific keys out of the files

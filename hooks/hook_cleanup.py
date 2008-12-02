@@ -47,48 +47,48 @@ def main(argv=None):
 
    # Read the class ad from stdin and store the S3 information
    for line in sys.stdin:
-      match = grep('^s3bucketid\s*=\s*"(.+)"$', line.lower())
-      if match != None and match[0] != None:
-         bucket = match[0].rstrip()
+      match = grep('^(.*)\s*=\s*(.*)$', line.lstrip())
+      if match != None and match[0] != None and match[1] != None:
+         attribute = match[0].rstrip()
+         val_match = grep('^"(.*)"$', match[1].rstrip())
+         if val_match != None and val_match[0] != None:
+            value = val_match[0].rstrip()
+         else:
+            value = match[1].rstrip()
+      if attribute.lower() == 's3bucketid':
+         bucket = value
          continue
-      match = grep('^s3keyid\s*=\s*"(.+)"$', line.lower())
-      if match != None and match[0] != None:
-         key = match[0].rstrip().upper()
+      if attribute.lower() == 's3keyid':
+         key = value
          continue
-      match = grep('^sqsmessageid\s*=\s*"(.+)"$', line.lower())
-      if match != None and match[0] != None:
-         sqs_msg_id = match[0].rstrip().upper()
+      if attribute.lower() == 'sqsmessageid':
+         sqs_msg_id = value
          continue
-      match = grep('^amazonaccesskey\s*=\s*"(.+)"$', line.lower())
-      if match != None and match[0] != None:
-         aws_key = match[0].rstrip()
+      if attribute.lower() == 'amazonaccesskey':
+         aws_key = value
          continue
-      match = grep('^amazonsecretkey\s*=\s*"(.+)"$', line.lower())
-      if match != None and match[0] != None:
-         aws_secret = match[0].rstrip()
+      if attribute.lower() == 'amazonsecretkey':
+         aws_secret = value
          continue
-      match = grep('^amazonsqsqueuename\s*=\s*"(.+)"', line.lower())
-      if match != None and match[0] != None:
-         queue_name = match[0].rstrip()
+      if attribute.lower() == 'amazonsqsqueuename':
+         queue_name = value
          continue
-      match = grep('^jobstate\s*=\s*"(.+)"$', line.lower())
-      if match != None and match[0] != None:
-         state = match[0].rstrip()
+      if attribute.lower() == 'jobstate':
+         state = value
          continue
-      match = grep('^jobstatus\s*=\s*(.+)$', line.lower())
-      if match != None and match[0] != None:
-         status = int(match[0].rstrip())
+      if attribute.lower() == 'jobstatus':
+         status = value
          continue
-      match = grep('^amazonuserdatafile\s*=\s*"(.*)"$', line.lower())
-      if match != None and match[0] != None:
-         key_file = match[0].rstrip()
+      if attribute.lower() == 'amazonuserdatafile':
+         key_file = value
+         continue
 
    # Delete the file containing the encrypted keys if present
    if key_file != '' and os.path.exists(key_file):
       os.remove(key_file)
 
    # If the job completed, no need to clean up AWS
-   if state == 'exited' or status == 4:
+   if state == 'Exited' or status == 4:
       ret_val = SUCCESS
    else:
       # Pull the specific keys out of the files
@@ -144,7 +144,9 @@ def main(argv=None):
                   # Grab the S3 key if it wasn't defined already
                   if key == '':
                      if msg.s3_key == None:
-                        s3_key = grep('^s3keyid\s*=\s*"(.+)"$', msg.class_ad.lower())
+                        s3_key = grep('^S3KeyID\s*=\s*"(.+)"$', msg.class_ad)
+                        if s3_key == None or s3_key[0] == None:
+                           s3_key = grep('^s3keyid\s*=\s*"(.+)"$', msg.class_ad)
                         if s3_key != None and s3_key[0] != None:
                            key = s3_key[0]
                      else:
