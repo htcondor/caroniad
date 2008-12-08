@@ -19,7 +19,6 @@ import syslog
 import re
 import pickle
 import time
-from subprocess import *
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 from boto.sqs.connection import SQSConnection
@@ -36,13 +35,14 @@ def main(argv=None):
    status_classad = ''
    aws_key = ''
    aws_secret = ''
+   current_job_status = 1
 
    for line in sys.stdin:
       request_classad += line
       match = grep('^(.*)\s*=\s*"(.*)"$', line.lstrip())
       if match != None and match[0] != None and match[1] != None:
-         attribute = match[0].rstrip()
-         value = match[1].rstrip()
+         attribute = match[0].rstrip().lstrip()
+         value = match[1].rstrip().lstrip()
       if attribute.lower() == 'sqsmessageid':
          sqs_msg_id = value
          continue
@@ -52,12 +52,17 @@ def main(argv=None):
       if attribute.lower() == 'amazonsecretkey':
          aws_secret = value
          continue
+      if attribute.lower() == 'jobstatus':
+         current_job_status = value
+         continue
 
    # Get the specified Amazon key information
-   process = Popen(['cat', aws_key], stdout=PIPE)
-   aws_key_val = process.communicate()[0].rstrip()
-   process = Popen(['cat', aws_secret], stdout=PIPE)
-   aws_secret_val = process.communicate()[0].rstrip()
+   key_file = open(aws_key, 'r')
+   aws_key_val = key_file.readlines()[0].rstrip()
+   key_file.close()
+   key_file = open(aws_secret, 'r')
+   aws_secret_val = key_file.readlines()[0].rstrip()
+   key_file.close()
 
    # Cycle through the results looking for info on the supplied class ad
    sqs_con = SQSConnection(aws_key_val, aws_secret_val)
@@ -67,11 +72,23 @@ def main(argv=None):
    q_msg = sqs_queue.read(60)
    msg_list = {}
    while q_msg != None:
-      msg = pickle.loads(q_msg.get_body())
+      try:
+         msg = pickle.loads(q_msg.get_body())
+      except:
+         # Likely bad message in the queue so skip it by setting the
+         # visibility timer far enough in the future that we're unlikely
+         # to hit it again this pass but not so far that it won't be seen
+         # for a long time and then move on to the next message
+         q_msg.change_visibility(15)
+         continue
+
       matches = grep('^SQSMessageId\s*=\s*"(.+)"$', msg.class_ad)
       if matches != None:
          if sqs_msg_id.lower() == matches[0].lower():
-            if job_complete_found == 0:
+            # This message will be the status update unless a message
+            # indicating job completion has already been found or the job
+            # requesting an update has already been marked as completed (4)
+            if job_complete_found == 0 and current_job_status != 4:
                # We haven't found a message to indicate the job is done
                # so this message will be the status update
                status_classad = msg.class_ad
@@ -101,10 +118,14 @@ def main(argv=None):
                   # the queue.  This is necessary because SQS isn't guaranteed
                   # to be FIFO, even though it tries to be so
                   job_complete_found = 1
+
+            # Remove the message from the queue
             sqs_queue.delete_message(q_msg)
             if job_complete_found == 0:
                # Message we found wasn't a job complete update, so break
-               # out of the loop
+               # out of the loop because we only want to continue processing
+               # status messages if we received a message that indicates the
+               # job completed
                break
          else:
             msg_list.update({matches[0]:q_msg})

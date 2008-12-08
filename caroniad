@@ -97,14 +97,19 @@ class global_data(object):
       self.__access_lock__.release()
 
    def add_work(self, key, SQS_msg, slot):
-      """Add work information to list of known work items.  Raises a
-         general_exception if the key already exists"""
+      """Add work information to list of known work items.  If work is already
+         in the queue then the new work will return 0, otherwise 1 is
+         returned.  Raises a general_exception if the key already exists"""
+      ret_val = 0
       work = work_data(SQS_msg, slot)
       if self.__find_work__(key) == False:
          self.lock()
-         self.__work_list__.update({key:work})
-         self.__total_jobs_running__ = self.__total_jobs_running__ + 1
+         if self.__total_jobs_running__ == 0:
+            self.__work_list__.update({key:work})
+            self.__total_jobs_running__ = self.__total_jobs_running__ + 1
+            ret_val = 1
          self.unlock()
+         return ret_val
       else:
          raise general_exception(syslog.LOG_WARNING, 'Key %s already exists.' % key)
 
@@ -274,6 +279,16 @@ def handle_get_work(req_socket, reply, queue, known_items, log):
    file_attribs = ['err', 'out', 'transferoutput']
 
    try:
+      # If a job is already being process, do not attempt to process another
+      # request
+      if known_items.get_total_jobs_running() > 0:
+         if log == True:
+            print '%s: Already processing %s job(s).  Ignoring request for more work' % (func_name, known_items.get_total_jobs_running())
+         reply.data = ''
+         req_socket.send(pickle.dumps(reply, 2))
+         close_socket(req_socket)
+         return(SUCCESS)
+
       # Figure out the SlotID that is requesting work, and don't get any
       # more work if it is still processing work from a previous call
       slots = grep('^SlotID\s*=\s*(.+)$', reply.data)
@@ -359,7 +374,14 @@ def handle_get_work(req_socket, reply, queue, known_items, log):
       # deleted or released as needed
       if log == True:
          print '%s: Adding msg id %s to known items' % (func_name, msg_num)
-      known_items.add_work(msg_num, q_msg, slot)
+      if known_items.add_work(msg_num, q_msg, slot) == 0:
+         # Already processing a job, so adding the job to the list of
+         # known work was rejected.  Release the message and make sure the
+         # job won't be processed
+         if log == True:
+            print '%s: Adding job to list of work rejected.  Already processing %s job(s)' % (func_name, known_items.get_total_jobs_running())
+         q_msg.change_visibility(1)
+         reply.data = ''
    
       # Send the work to the requesting client
       req_socket.send(pickle.dumps(reply, 2))
@@ -598,13 +620,12 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
 
       # Retrieve the SQS message from the list of known messages so it
       # can be acknowledged or released
-      saved_work = known_items.remove_work(message_id)
+      saved_work = known_items.get_work(message_id)
       if saved_work == None:
          # Couldn't find the SQS message that corresponds to the SQSMessageId
          # in the exit message.  This is bad and shouldn't happen.
          raise general_exception(syslog.LOG_ERR, 'Unable to find stored SQS message with SQSMessageId %s.  Message cannot be acknowledged nor results sent!' % str(message_id))
       else:
-
          try:
             # Retrieve the saved classad information for the
             # results message.
@@ -859,12 +880,21 @@ def main(argv=None):
               condor_msg.type == condor_wf_types.exit_hold or \
               condor_msg.type == condor_wf_types.exit_evict:
             child = threading.Thread(target=handle_exit, args=(sock, condor_msg, s3_connection, work_queue, status_queue, share_data, debug_logging))
-            # Only handle 1 job
+            # Only handle 1 job, and it has completed so shutdown now
             try:
                listen_socket.shutdown(socket.SHUT_RDWR)
             except:
                pass
             listen_socket.close()
+
+            # Find the SQSMessageId in the message we received
+            message_ids = grep('^SQSMessageId\s*=\s*"(.+)"$', condor_msg.data)
+            if message_ids == None:
+               raise general_exception(syslog.LOG_ERR, condor_msg.data, 'Unable to find SQSMessageId to delete from known work')
+            else:
+               message_id = message_ids[0]
+            share_data.remove_work(message_id)
+            call(['shutdown',  '-h',  '-P',  'now'])
          else:
             syslog.syslog(syslog.LOG_WARNING, 'Received unknown request: %d' % condor_msg.type)
             continue

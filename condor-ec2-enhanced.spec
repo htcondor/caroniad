@@ -1,7 +1,7 @@
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
 Version: 1.0
-Release: 3%{?dist}
+Release: 4%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -14,6 +14,7 @@ Requires: condor-job-hooks
 Requires: condor-job-hooks-common
 Requires: condor-ec2-enhanced-hooks-common
 Requires: python-boto >= 1.0a
+Requires: openssl
 
 Requires(post):/sbin/chkconfig
 Requires(preun):/sbin/chkconfig
@@ -65,6 +66,10 @@ fi
 %_sbindir/caroniad
 
 %changelog
+* Sun Dec  7 2008  <rrati@redhat> - 1.0-4
+- Ensure only 1 job is handled to completion then shutdown
+- Added openssl dependency
+
 * Wed Nov 10 2008  <rrati@redhat> - 1.0-3
 - Daemon is on by default
 

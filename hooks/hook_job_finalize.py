@@ -21,7 +21,6 @@ import random
 import pickle
 import time
 import tarfile
-from subprocess import *
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 from boto.sqs.connection import SQSConnection
@@ -64,10 +63,12 @@ def main(argv=None):
          continue
 
    # Pull the specific keys out of the files
-   process = Popen(['cat', aws_key], stdout=PIPE)
-   aws_key_val = process.communicate()[0].rstrip()
-   process = Popen(['cat', aws_secret], stdout=PIPE)
-   aws_secret_val = process.communicate()[0].rstrip()
+   key_file = open(aws_key, 'r')
+   aws_key_val = key_file.readlines()[0].rstrip()
+   key_file.close()
+   key_file = open(aws_secret, 'r')
+   aws_secret_val = key_file.readlines()[0].rstrip()
+   key_file.close()
 
    # Access S3 and extract the data into the staging area
    results_filename = 'results.tar.gz'

@@ -3,18 +3,19 @@
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
 Version: 1.0
-Release: 4%{?dist}
+Release: 5%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
 Source0: %{name}-%{version}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
-Requires: python >= 2.4
+Requires: python >= 2.3
 Requires: condor >= 7.0.2-4
 Requires: condor-job-hooks-common
 Requires: condor-ec2-enhanced-hooks-common
 Requires: python-boto >= 1.0a
+Requires: openssl
 
 %description
 The EC2 Enhanced feature allows for near seamless translation of Condor jobs
@@ -31,6 +32,7 @@ feature.
 Summary: Common functions/utilities for condor job hooks
 Group: Applications/System
 BuildRequires: python-devel
+Requires: python >= 2.3
 
 %description common
 Common functions and utilities used by MRG condor job hooks.
@@ -64,6 +66,11 @@ touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
 %{python_sitelib}/ec2enhanced/__init__.py*
 
 %changelog
+* Sun Dec  7 2008  <rrati@redhat> - 1.0-5
+- Fixed python dep issue on RHEL4
+- Changes for python 2.3 compatibility
+- Added openssl dependency
+
 * Mon Dec  1 2008  <rrati@redhat> - 1.0-4
 - Fixed issue with uppercase file names being converted to lowercase names
   (BZ474071)

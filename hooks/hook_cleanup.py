@@ -21,7 +21,6 @@ import random
 import pickle
 import time
 import tarfile
-from subprocess import *
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 from boto.sqs.connection import SQSConnection
@@ -52,9 +51,9 @@ def main(argv=None):
          attribute = match[0].rstrip()
          val_match = grep('^"(.*)"$', match[1].rstrip())
          if val_match != None and val_match[0] != None:
-            value = val_match[0].rstrip()
+            value = val_match[0].rstrip().lstrip()
          else:
-            value = match[1].rstrip()
+            value = match[1].rstrip().lstrip()
       if attribute.lower() == 's3bucketid':
          bucket = value
          continue
@@ -92,10 +91,12 @@ def main(argv=None):
       ret_val = SUCCESS
    else:
       # Pull the specific keys out of the files
-      process = Popen(['cat', aws_key], stdout=PIPE)
-      aws_key_val = process.communicate()[0].rstrip()
-      process = Popen(['cat', aws_secret], stdout=PIPE)
-      aws_secret_val = process.communicate()[0].rstrip()
+      key_file = open(aws_key, 'r')
+      aws_key_val = key_file.readlines()[0].rstrip()
+      key_file.close()
+      key_file = open(aws_secret, 'r')
+      aws_secret_val = key_file.readlines()[0].rstrip()
+      key_file.close()
 
       # Remove the work from SQS
       work_queue = None
@@ -135,10 +136,22 @@ def main(argv=None):
       if results_queue != None:
          q_msg = results_queue.read(60)
          while q_msg != None:
-            msg = pickle.loads(q_msg.get_body())
+            try:
+               msg = pickle.loads(q_msg.get_body())
+            except:
+               # Likely bad message in the queue so skip it by setting the
+               # visibility timer far enough in the future that we're unlikely
+               # to hit it again this pass but not so far that it won't be seen
+               # for a long time and then move on to the next message
+               q_msg.change_visibility(15)
+               continue
+
             matches = grep('^SQSMessageId\s*=\s*"(.*)"$', msg.class_ad)
             if matches != None:
                if sqs_msg_id.lower() == matches[0].lower():
+                  # Found a message in the queue, which is good.  There may be
+                  # more so keep processing
+                  ret_val = SUCCESS
                   results_queue.delete_message(q_msg)
    
                   # Grab the S3 key if it wasn't defined already
@@ -154,10 +167,10 @@ def main(argv=None):
    
                   # Check the job status to see if this message notifies of
                   # job completion
-                  job_status = grep('^JobStatus\s*=\s*(.)$', msg.class_ad)
-                  if job_status != None and job_status[0] != None and \
-                     int(job_status[0].rstrip()) == 4:
-                     ret_val = SUCCESS
+#                  job_status = grep('^JobStatus\s*=\s*(.)$', msg.class_ad)
+#                  if job_status != None and job_status[0] != None and \
+#                     int(job_status[0].rstrip().lstrip()) == 4:
+#                     ret_val = SUCCESS
                else:
                   msg_list.update({matches[0]:q_msg})
             q_msg = results_queue.read(60)
@@ -183,7 +196,7 @@ def main(argv=None):
          try:
             s3_key_obj = s3_bucket_obj.get_key(key.upper())
             s3_bucket_obj.delete_key(s3_key_obj)
-         except:
+         except BotoServerError, error:
             syslog.syslog(syslog.LOG_ERR, 'Unable to delete S3 key "%s": %s, %s' % (key, error.reason, error.body))
             return(FAILURE)
 

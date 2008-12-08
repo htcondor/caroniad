@@ -21,7 +21,7 @@ import random
 import pickle
 import time
 import tarfile
-from subprocess import *
+from popen2 import popen2
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 from boto.sqs.connection import SQSConnection
@@ -237,17 +237,20 @@ def main(argv=None):
    sqs_data.class_ad += 'AmazonSecretKey = "%s"\n' % str(aws_secret_file)
 
    # Pull the specific keys out of the files
-   process = Popen(['cat', aws_key_file], stdout=PIPE)
-   aws_key_val = process.communicate()[0].rstrip()
-   process = Popen(['cat', aws_secret_file], stdout=PIPE)
-   aws_secret_val = process.communicate()[0].rstrip()
+   key_file = open(aws_key_file, 'r')
+   aws_key_val = key_file.readlines()[0].rstrip()
+   key_file.close()
+   key_file = open(aws_secret_file, 'r')
+   aws_secret_val = key_file.readlines()[0].rstrip()
    sqs_queue_name = '%s-%s' % (str(aws_key_val), queue_name)
+   key_file.close()
 
    # Encode the access keys
    keys = aws_key_val + '\n' + aws_secret_val + '\n' + queue_name
-   process1 = Popen(['echo', keys], stdout=PIPE)
-   process2 = Popen(['openssl', 'rsautl', '-inkey', rsa_public_key_file, '-pubin', '-encrypt'], stdin=process1.stdout, stdout=PIPE)
-   enc_keys = process2.communicate()[0].rstrip()
+   val = popen2('openssl rsautl -inkey "%s" -pubin -encrypt' % rsa_public_key_file)
+   val[1].write(keys)
+   val[1].close()
+   enc_keys = val[0].readlines()[0].rstrip()
    aws_filename = '/tmp/aws-keys-' + str(os.getpid())
    file = open(aws_filename, 'w')
    file.writelines(enc_keys)
