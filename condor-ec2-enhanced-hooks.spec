@@ -69,7 +69,7 @@ touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
 * Tue Dec  9 2008  <rrati@redhat> - 1.0-6
 - S3 data is stored in unique buckets
 - Print errors when having problems accessing S3
-- Only encrypted the AWS secret access key
+- Only encrypted the AWS secret access key and base64 encode
 - Print error message if invalid key files are given
 
 * Sun Dec  7 2008  <rrati@redhat> - 1.0-5

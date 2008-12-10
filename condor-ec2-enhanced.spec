@@ -69,7 +69,7 @@ fi
 * Tue Dec  9 2008  <rrati@redhat> - 1.0-5
 - Fixed JobStatus and Owner reporting issues
 - AMI is now shutdown after exit message sent
-- Only decrypt the AWS secret access key
+- Only decrypt the AWS secret access key and base64 decode
 
 * Sun Dec  7 2008  <rrati@redhat> - 1.0-4
 - Ensure only 1 job is handled to completion then shutdown
