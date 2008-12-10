@@ -17,10 +17,7 @@ import sys
 import os
 import syslog
 import re
-import random
 import pickle
-import time
-import tarfile
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 from boto.sqs.connection import SQSConnection
@@ -91,12 +88,18 @@ def main(argv=None):
       ret_val = SUCCESS
    else:
       # Pull the specific keys out of the files
-      key_file = open(aws_key, 'r')
-      aws_key_val = key_file.readlines()[0].rstrip()
-      key_file.close()
-      key_file = open(aws_secret, 'r')
-      aws_secret_val = key_file.readlines()[0].rstrip()
-      key_file.close()
+      if os.path.exists(aws_key) == False or \
+         os.path.exists(aws_secret) == False:
+         syslog.syslog(syslog.LOG_ERR, 'Error: File %s not found' % aws_key)
+         print 'Error: File %s not found' % aws_key
+         return(FAILURE)
+      else:
+         key_file = open(aws_key, 'r')
+         aws_key_val = key_file.readlines()[0].rstrip()
+         key_file.close()
+         key_file = open(aws_secret, 'r')
+         aws_secret_val = key_file.readlines()[0].rstrip()
+         key_file.close()
 
       # Remove the work from SQS
       work_queue = None
@@ -144,6 +147,7 @@ def main(argv=None):
                # to hit it again this pass but not so far that it won't be seen
                # for a long time and then move on to the next message
                q_msg.change_visibility(15)
+               q_msg = results_queue.read(60)
                continue
 
             matches = grep('^SQSMessageId\s*=\s*"(.*)"$', msg.class_ad)
@@ -187,17 +191,22 @@ def main(argv=None):
             s3_con = S3Connection(aws_key_val, aws_secret_val)
             s3_bucket_obj = s3_con.create_bucket(bucket)
          except BotoServerError, error:
-            syslog.syslog(syslog.LOG_ERR, 'Error: %s, %s' % (error.reason, error.body))
+            syslog.syslog(syslog.LOG_ERR, 'Error accessing S3: %s, %s' % (error.reason, error.body))
       else:
          syslog.syslog(syslog.LOG_INFO, 'No S3 bucket defined')
 
       # Remove the data from S3
       if key != '':
          try:
-            s3_key_obj = s3_bucket_obj.get_key(key.upper())
-            s3_bucket_obj.delete_key(s3_key_obj)
+            if s3_bucket_obj == None:
+               syslog.syslog(syslog.LOG_ERR, 'Error: Unable to access S3 to clean up data in S3 bucket %s' % bucket)
+               print 'Error: Unable to access S3 to clean up data in S3 bucket %s' % bucket
+               return(FAILURE)
+            else:
+               s3_key_obj = s3_bucket_obj.get_key(key.upper())
+               s3_bucket_obj.delete_key(s3_key_obj)
          except BotoServerError, error:
-            syslog.syslog(syslog.LOG_ERR, 'Unable to delete S3 key "%s": %s, %s' % (key, error.reason, error.body))
+            syslog.syslog(syslog.LOG_ERR, 'Error: Unable to delete S3 key "%s": %s, %s' % (key, error.reason, error.body))
             return(FAILURE)
 
       if bucket != '':

@@ -1,7 +1,7 @@
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
 Version: 1.0
-Release: 4%{?dist}
+Release: 5%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -66,6 +66,11 @@ fi
 %_sbindir/caroniad
 
 %changelog
+* Tue Dec  9 2008  <rrati@redhat> - 1.0-5
+- Fixed JobStatus and Owner reporting issues
+- AMI is now shutdown after exit message sent
+- Only decrypt the AWS secret access key
+
 * Sun Dec  7 2008  <rrati@redhat> - 1.0-4
 - Ensure only 1 job is handled to completion then shutdown
 - Added openssl dependency

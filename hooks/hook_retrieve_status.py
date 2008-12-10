@@ -18,7 +18,6 @@ import os
 import syslog
 import re
 import pickle
-import time
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 from boto.sqs.connection import SQSConnection
@@ -57,12 +56,17 @@ def main(argv=None):
          continue
 
    # Get the specified Amazon key information
-   key_file = open(aws_key, 'r')
-   aws_key_val = key_file.readlines()[0].rstrip()
-   key_file.close()
-   key_file = open(aws_secret, 'r')
-   aws_secret_val = key_file.readlines()[0].rstrip()
-   key_file.close()
+   if os.path.exists(aws_key) == False or os.path.exists(aws_secret) == False:
+      syslog.syslog(syslog.LOG_ERR, 'ERROR: File %s not found' % aws_key)
+      print 'ERROR: File %s not found' % aws_key
+      return(FAILURE)
+   else:
+      key_file = open(aws_key, 'r')
+      aws_key_val = key_file.readlines()[0].rstrip()
+      key_file.close()
+      key_file = open(aws_secret, 'r')
+      aws_secret_val = key_file.readlines()[0].rstrip()
+      key_file.close()
 
    # Cycle through the results looking for info on the supplied class ad
    sqs_con = SQSConnection(aws_key_val, aws_secret_val)
@@ -80,6 +84,7 @@ def main(argv=None):
          # to hit it again this pass but not so far that it won't be seen
          # for a long time and then move on to the next message
          q_msg.change_visibility(15)
+         q_msg = sqs_queue.read(60)
          continue
 
       matches = grep('^SQSMessageId\s*=\s*"(.+)"$', msg.class_ad)

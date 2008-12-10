@@ -19,8 +19,8 @@ import syslog
 import re
 import random
 import pickle
-import time
 import tarfile
+import base64
 from popen2 import popen2
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
@@ -237,23 +237,30 @@ def main(argv=None):
    sqs_data.class_ad += 'AmazonSecretKey = "%s"\n' % str(aws_secret_file)
 
    # Pull the specific keys out of the files
-   key_file = open(aws_key_file, 'r')
-   aws_key_val = key_file.readlines()[0].rstrip()
-   key_file.close()
-   key_file = open(aws_secret_file, 'r')
-   aws_secret_val = key_file.readlines()[0].rstrip()
+   if os.path.exists(aws_key_file) == False or \
+      os.path.exists(aws_secret_file) == False:
+      syslog.syslog(syslog.LOG_ERR, 'ERROR: File %s not found' % aws_key_file)
+      print 'ERROR: File %s not found' % aws_key_file
+      return(FAILURE)
+   else:
+      key_file = open(aws_key_file, 'r')
+      aws_key_val = key_file.readlines()[0].rstrip()
+      key_file.close()
+      key_file = open(aws_secret_file, 'r')
+      aws_secret_val = key_file.readlines()[0].rstrip()
+      key_file.close()
    sqs_queue_name = '%s-%s' % (str(aws_key_val), queue_name)
-   key_file.close()
 
-   # Encode the access keys
-   keys = aws_key_val + '\n' + aws_secret_val + '\n' + queue_name
+   # Encode the secret key
    val = popen2('openssl rsautl -inkey "%s" -pubin -encrypt' % rsa_public_key_file)
-   val[1].write(keys)
+   val[1].write(aws_secret_val)
    val[1].close()
-   enc_keys = val[0].readlines()[0].rstrip()
+   enc_key = val[0].read().rstrip()
    aws_filename = '/tmp/aws-keys-' + str(os.getpid())
    file = open(aws_filename, 'w')
-   file.writelines(enc_keys)
+   file.write(aws_key_val + '\n')
+   file.write(base64.encodestring(enc_key).replace('\n','') + '\n')
+   file.write(queue_name)
    file.close()
    sqs_data.class_ad += 'AmazonUserDataFile = "%s"\n' % str(aws_filename)
    grid_classad += 'AmazonUserDataFile = "%s"\n' % str(aws_filename)
@@ -261,9 +268,10 @@ def main(argv=None):
    # Open the connection to Amazon's S3 and create a key input/output of
    # data
    s3_con = S3Connection(aws_key_val, aws_secret_val)
-   s3_bucket = s3_con.create_bucket(bucket_id)
-   sqs_data.s3_bucket = bucket_id
-   grid_classad += 'S3BucketID = "%s"\n' % bucket_id
+   s3_bucket_name = '%s-%s' % (str(aws_key_val), bucket_id)
+   s3_bucket = s3_con.create_bucket(s3_bucket_name)
+   sqs_data.s3_bucket = s3_bucket_name
+   grid_classad += 'S3BucketID = "%s"\n' % s3_bucket_name
 
    # Generate the sandbox if needed and place it into Amazon's S3
    if create_sandbox == 'yes' and transfer_exe == 'true':
@@ -280,11 +288,17 @@ def main(argv=None):
       random.seed()
       rand_num = random.randint(1, max_key_id)
       s3_key = Key(s3_bucket)
-      s3_key.key = str(aws_key_val) + '-' + str(rand_num)
-      sqs_data.s3_key = s3_key.key
-      s3_key.set_contents_from_filename(tarfile_name)
-      os.remove(tarfile_name)
-      grid_classad += 'S3KeyID = "%s"\n' % s3_key.key
+      if s3_key == None:
+         syslog.syslog(syslog.LOG_ERR, 'Error: Unable to access S3 to set job data in S3 bucket %s' % s3_bucket_name)
+         print 'Error: Unable to access S3 to set job data in S3 bucket %s' % s3_bucket_name
+         os.remove(tarfile_name)
+         return(FAILURE)
+      else:
+         s3_key.key = str(aws_key_val) + '-' + str(rand_num)
+         sqs_data.s3_key = s3_key.key
+         s3_key.set_contents_from_filename(tarfile_name)
+         os.remove(tarfile_name)
+         grid_classad += 'S3KeyID = "%s"\n' % s3_key.key
 
    # Put the original class ad into Amazon's SQS
    message = Message(body=pickle.dumps(sqs_data))

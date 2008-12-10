@@ -3,7 +3,7 @@
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
 Version: 1.0
-Release: 5%{?dist}
+Release: 6%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -66,6 +66,12 @@ touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
 %{python_sitelib}/ec2enhanced/__init__.py*
 
 %changelog
+* Tue Dec  9 2008  <rrati@redhat> - 1.0-6
+- S3 data is stored in unique buckets
+- Print errors when having problems accessing S3
+- Only encrypted the AWS secret access key
+- Print error message if invalid key files are given
+
 * Sun Dec  7 2008  <rrati@redhat> - 1.0-5
 - Fixed python dep issue on RHEL4
 - Changes for python 2.3 compatibility

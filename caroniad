@@ -22,10 +22,10 @@ import syslog
 import re
 import threading
 import signal
-import zipfile
 import getopt
 import tarfile
 import random
+import base64
 from subprocess import *
 from jobhooks.functions import *
 from ec2enhanced.functions import *
@@ -331,7 +331,7 @@ def handle_get_work(req_socket, reply, queue, known_items, log):
             if match[0].rstrip().lower() in remove_attribs:
                continue
 
-            if match[0].rstrip().lower() == 'owner':
+            if match[0].rstrip().lower() == 'owner' and match[1] != None:
                ad += '%s = "condor"\n' % match[0].rstrip()
                ad += 'EC2OrigOwner = %s\n' % match[1].rstrip()
                continue
@@ -435,13 +435,16 @@ def handle_reply_fetch(msg, queue, known_items, log):
                elif match != None and match[0] != None:
                   if match[0].rstrip().lower() in remove_attribs:
                      continue
-                  elif match[0].rstrip() == 'JobStatus':
+                  elif match[0].rstrip().lower() == 'jobstatus':
                      result_ad += 'JobStatus = 2\n'
                      continue
-                  elif match[0].rstrip() == 'EC2OrigOwner':
+                  elif match[0].rstrip() == 'EC2OrigOwner' and match[1] != None:
                      orig_owner = match[1].rstrip()
                      continue
-               result_ad += line + "\n"
+                  elif match[0].rstrip().lower() == 'owner':
+                     continue
+               if line != '':
+                  result_ad += line + "\n"
             result_ad += 'Owner = %s\n' % orig_owner
 
             response = pickle.loads(saved_work.SQS_msg.get_body())
@@ -557,13 +560,16 @@ def handle_update_job_status(msg, queue, known_items, log):
                if match != None and match[0] != None:
                   if match[0].rstrip().lower() in remove_attribs:
                      continue
-                  elif match[0].rstrip() == 'JobStatus':
+                  elif match[0].rstrip().lower() == 'jobstatus':
                      result_ad += 'JobStatus = 2\n'
                      continue
-                  elif match[0].rstrip() == 'EC2OrigOwner':
+                  elif match[0].rstrip() == 'EC2OrigOwner' and match[1] != None:
                      orig_owner = match[1].rstrip()
                      continue
-               result_ad += line + "\n"
+                  elif match[0].rstrip().lower() == 'owner':
+                     continue
+               if line != '':
+                  result_ad += line + "\n"
             result_ad += 'Owner = %s\n' % orig_owner
 
             response = pickle.loads(saved_work.SQS_msg.get_body())
@@ -691,13 +697,16 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
                for line in msg.data.split('\n'):
                   match = grep('^(.*)\s*=\s*(.+)$', line)
                   if match != None and match[0] != None:
-                     if re.match('JobStatus', line) != None:
+                     if match[0].rstrip().lower() == 'jobstatus':
                         result_ad += 'JobStatus = 4\n'
                         continue
                      elif match[0].rstrip().lower() in remove_attribs:
                         continue
-                     elif match[0].rstrip() == 'EC2OrigOwner':
+                     elif match[0].rstrip() == 'EC2OrigOwner' and \
+                          match[1] != None:
                         orig_owner = match[1].rstrip()
+                        continue
+                     elif match[0].rstrip().lower() == 'owner':
                         continue
                   if line != '':
                      result_ad += line + "\n"
@@ -721,6 +730,9 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
 
                # Remove the message from the SQS queue
                work_q.delete_message(saved_work.SQS_msg)
+
+               # Shutdown now that the job has finished
+               call(['shutdown',  '-h',  '-P',  'now'])
             else:
                # Job didn't exit normally
                if log == True:
@@ -776,6 +788,8 @@ def main(argv=None):
       if user_data == None:
          # Send message about startup failure
          raise general_exception(syslog.LOG_ERR, "No User Data")
+      else:
+         user_data = user_data.split('\n')
 
       if daemon_mode == 1:
          try:
@@ -808,17 +822,17 @@ def main(argv=None):
       # Set signal handlers
       signal.signal(signal.SIGINT, exit_signal_handler)
 
-      # Decrypt the user_data to get the access keys
+      # Decrypt the secret key in the user_data
       file = open('/root/data', 'w')
-      file.writelines(user_data)
+      file.write(base64.decodestring(user_data[1]))
       file.close()
 
       process = Popen(['openssl', 'rsautl', '-inkey', private_key_file, '-decrypt', '-in', '/root/data'], stdout=PIPE)
-      data = process.communicate()[0].rstrip().split('\n')
+      data = process.communicate()[0].rstrip()
       os.remove('/root/data')
-      access_key = data[0].rstrip()
-      secret_key = data[1].rstrip()
-      queue_name = data[2].rstrip()
+      access_key = user_data[0].rstrip()
+      secret_key = data.rstrip()
+      queue_name = user_data[2].rstrip()
 
       try:
          sqs_config = read_config_file('/etc/opt/grid/caroniad.conf', 'Daemon')
@@ -847,6 +861,7 @@ def main(argv=None):
 
       # Setup the socket for communication with condor
       listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+      listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
       try:
          listen_socket.bind((sqs_config['ip'], int(sqs_config['port'])))
          listen_socket.listen(int(sqs_config['queued_connections']))
@@ -880,21 +895,9 @@ def main(argv=None):
               condor_msg.type == condor_wf_types.exit_hold or \
               condor_msg.type == condor_wf_types.exit_evict:
             child = threading.Thread(target=handle_exit, args=(sock, condor_msg, s3_connection, work_queue, status_queue, share_data, debug_logging))
-            # Only handle 1 job, and it has completed so shutdown now
-            try:
-               listen_socket.shutdown(socket.SHUT_RDWR)
-            except:
-               pass
-            listen_socket.close()
-
-            # Find the SQSMessageId in the message we received
-            message_ids = grep('^SQSMessageId\s*=\s*"(.+)"$', condor_msg.data)
-            if message_ids == None:
-               raise general_exception(syslog.LOG_ERR, condor_msg.data, 'Unable to find SQSMessageId to delete from known work')
-            else:
-               message_id = message_ids[0]
-            share_data.remove_work(message_id)
-            call(['shutdown',  '-h',  '-P',  'now'])
+            # Only handle 1 job, and it has completed so close the listen
+            # socket
+            shutdown_sockets(listen_socket, None)
          else:
             syslog.syslog(syslog.LOG_WARNING, 'Received unknown request: %d' % condor_msg.type)
             continue
