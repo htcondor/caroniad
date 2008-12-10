@@ -192,29 +192,25 @@ def shutdown_sockets(sock1, sock2):
          pass
       sock2.close()
 
-def time_monitor(msg_list, sock):
+def time_monitor(msg_list, sock, mins):
    """Monitors how long the system has been running.  If it is idle at
       around 60 minute intervals, it will shut down the system"""
    func_name = "time_monitor"
    first_time = 1
-   sleep_time = 3600
+   interval = mins * 60
    process = Popen(['cat', '/proc/uptime'], stdout=PIPE)
    uptime = int(round(float(process.communicate()[0].rstrip().split()[0])))
-   time_from_next_hour = int(round(float((uptime % 3600)/60)))
+   time_from_next_hour = int(round(float((uptime % interval)/60)))
    while True:
       if first_time == 1:
          first_time = 0
-         sleep_time = int(3600 - ((time_from_next_hour+1)*60))
+         sleep_time = int(interval - ((time_from_next_hour+1)*60))
       else:
-         sleep_time = 3600
+         sleep_time = interval
       time.sleep(int(sleep_time))
       if msg_list.get_total_jobs_running() < 1:
          # No jobs are being processed, so close the socket and shutdown
-         try:
-            sock.shutdown(socket.SHUT_RDWR)
-         except:
-            pass
-         sock.close()
+         shutdown_sockets(sock, None)
          call(['shutdown',  '-h',  '-P',  'now'])
 
 def lease_monitor(msg_list, max_lease_time, interval, log):
@@ -308,9 +304,17 @@ def handle_get_work(req_socket, reply, queue, known_items, log):
          return(SUCCESS)
 
       # Get the work off the SQS work queue if it exists
-      q_msg = queue.read()
+      valid_message = 0
+      q_msg = queue.read(10)
+      while valid_message == 0 and q_msg != None:
+         try:
+            msg = pickle.loads(q_msg.get_body())
+            valid_message = 1
+         except:
+            # This is an invalid message, so ignore it and look for others.
+            q_msg = queue.read(10)
+
       if q_msg != None:
-         msg = pickle.loads(q_msg.get_body())
          reply.data = msg.class_ad
          job_run_time = grep('^JobLeaseDuration\s*=\s*(.+)$', reply.data)
          if job_run_time != None:
@@ -868,8 +872,8 @@ def main(argv=None):
       except socket.error, error:
          raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]), 'Failed to listen on %s:%s' % (sqs_config['ip'], sqs_config['port']))
 
-      # Create a thread to shutdown if idle at 60 minute intervals
-      timer_thread = threading.Thread(target=time_monitor, args=(share_data, listen_socket))
+      # Create a thread to shutdown if idle at a given interval
+      timer_thread = threading.Thread(target=time_monitor, args=(share_data, listen_socket, 15))
       timer_thread.setDaemon(True)
       timer_thread.start()
 
