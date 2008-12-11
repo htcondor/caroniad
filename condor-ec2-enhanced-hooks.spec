@@ -3,7 +3,7 @@
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
 Version: 1.0
-Release: 6%{?dist}
+Release: 7%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -66,6 +66,12 @@ touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
 %{python_sitelib}/ec2enhanced/__init__.py*
 
 %changelog
+* Wed Dec 10 2008  <rrati@redhat> - 1.0-7
+- Use GlobalJobId a part of unique S3 key
+- Handle more failure conditions when accessing AWS
+- Errors are printed to stderr
+- Read results from unique queue per job
+
 * Tue Dec  9 2008  <rrati@redhat> - 1.0-6
 - S3 data is stored in unique buckets
 - Print errors when having problems accessing S3

@@ -19,8 +19,6 @@ import syslog
 import re
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
-from boto.sqs.connection import SQSConnection
-from boto.sqs.message import Message
 from boto.exception import *
 from jobhooks.functions import *
 from ec2enhanced.functions import *
@@ -60,8 +58,8 @@ def main(argv=None):
 
    # Pull the specific keys out of the files
    if os.path.exists(aws_key) == False or os.path.exists(aws_secret) == False:
-      syslog.syslog(syslog.LOG_ERR, 'Error: File %s not found' % aws_key)
-      print 'Error: File %s not found' % aws_key
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to read AWS key files')
+      sys.stderr.write('Error: Unable to read AWS key files')
       return(FAILURE)
    else:
       key_file = open(aws_key, 'r')
@@ -76,36 +74,32 @@ def main(argv=None):
    try:
       os.chdir(spool_dir)
    except:
-      syslog.syslog(syslog.LOG_ERR, "os.chdir error")
+      syslog.syslog(syslog.LOG_ERR, 'Unable to chdir to "%s"' % spool_dir)
 
    try:
       s3_con = S3Connection(aws_key_val, aws_secret_val)
       s3_bucket_obj = s3_con.get_bucket(bucket)
       if s3_bucket_obj == None:
          syslog.syslog(syslog.LOG_ERR, 'Error: Unable to access S3 to retrieve data from S3 bucket %s' % bucket)
-         print 'Error: Unable to access S3 to retrieve data from S3 bucket %s' % bucket
+         sys.stderr.write('Error: Unable to access S3 to retrieve data from S3 bucket %s\n' % bucket)
          return(FAILURE)
       else:
-         s3_key_obj = s3_bucket_obj.get_key(key.upper())
+         s3_key_obj = s3_bucket_obj.get_key(key)
 
       if s3_key_obj != None:
          s3_key_obj.get_contents_to_filename(results_filename)
-         tarball_extract(results_filename)
       else:
          syslog.syslog(syslog.LOG_ERR, 'Unable to find S3 key "%s" in S3 bucket "%s"' % (key, bucket))
          return(FAILURE)
    except BotoServerError, error:
       syslog.syslog(syslog.LOG_ERR, 'Error accessing S3: %s, %s' % (error.reason, error.body))
+   tarball_extract(results_filename)
    if os.path.exists(results_filename):
       os.remove(results_filename)
 
    # Remove the data from S3
    if s3_bucket_obj != '':
       s3_bucket_obj.delete_key(s3_key_obj)
-      try:
-         s3_con.delete_bucket(s3_bucket_obj)
-      except:
-         pass
 
    return(SUCCESS)
 

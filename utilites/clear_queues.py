@@ -19,8 +19,15 @@ for queue in queues:
 #   print queue.get_attributes()
    m = queue.read(10)
    while m != None:
-      print pickle.loads(m.get_body()).class_ad
+      try:
+         print pickle.loads(m.get_body()).class_ad
+      except:
+         m = queue.read(10)
+         continue
       print
       queue.delete_message(m)
       m = queue.read(10)
-   conn.delete_queue(queue)
+   try:
+      conn.delete_queue(queue)
+   except:
+      pass

@@ -40,6 +40,7 @@ def main(argv=None):
    ret_val = FAILURE
    status = 1
    state = ''
+   queue_name = ''
 
    # Read the class ad from stdin and store the S3 information
    for line in sys.stdin:
@@ -66,7 +67,7 @@ def main(argv=None):
       if attribute.lower() == 'amazonsecretkey':
          aws_secret = value
          continue
-      if attribute.lower() == 'amazonsqsqueuename':
+      if attribute.lower() == 'amazonfullsqsqueuename':
          queue_name = value
          continue
       if attribute.lower() == 'jobstate':
@@ -90,8 +91,8 @@ def main(argv=None):
       # Pull the specific keys out of the files
       if os.path.exists(aws_key) == False or \
          os.path.exists(aws_secret) == False:
-         syslog.syslog(syslog.LOG_ERR, 'Error: File %s not found' % aws_key)
-         print 'Error: File %s not found' % aws_key
+         syslog.syslog(syslog.LOG_ERR, 'Error: Unable to read AWS key files')
+         sys.stderr.write('Error: Unable to read AWS key files')
          return(FAILURE)
       else:
          key_file = open(aws_key, 'r')
@@ -104,7 +105,13 @@ def main(argv=None):
       # Remove the work from SQS
       work_queue = None
       results_queue = None
-      sqs_con = SQSConnection(aws_key_val, aws_secret_val)
+      try:
+         sqs_con = SQSConnection(aws_key_val, aws_secret_val)
+      except:
+         syslog.syslog(syslog.LOG_ERR, 'Error: Unable to connect to SQS')
+         sys.stderr.write('Error: Unable to connect to SQS\n')
+         return(FAILURE)
+
       try:
          work_queue = sqs_con.create_queue('%s-%s' % (str(aws_key_val), queue_name))
       except BotoServerError, error:
@@ -112,7 +119,7 @@ def main(argv=None):
          return(FAILURE)
 
       try:
-         results_queue = sqs_con.create_queue('%s-%s' % (str(aws_key_val), 'condor_status_queue'))
+         results_queue = sqs_con.create_queue('%s-%s-status' % (str(aws_key_val), queue_name))
       except:
          pass
 
@@ -192,29 +199,24 @@ def main(argv=None):
             s3_bucket_obj = s3_con.create_bucket(bucket)
          except BotoServerError, error:
             syslog.syslog(syslog.LOG_ERR, 'Error accessing S3: %s, %s' % (error.reason, error.body))
-      else:
-         syslog.syslog(syslog.LOG_INFO, 'No S3 bucket defined')
-
-      # Remove the data from S3
-      if key != '':
-         try:
-            if s3_bucket_obj == None:
-               syslog.syslog(syslog.LOG_ERR, 'Error: Unable to access S3 to clean up data in S3 bucket %s' % bucket)
-               print 'Error: Unable to access S3 to clean up data in S3 bucket %s' % bucket
-               return(FAILURE)
-            else:
-               s3_key_obj = s3_bucket_obj.get_key(key.upper())
-               s3_bucket_obj.delete_key(s3_key_obj)
-         except BotoServerError, error:
-            syslog.syslog(syslog.LOG_ERR, 'Error: Unable to delete S3 key "%s": %s, %s' % (key, error.reason, error.body))
             return(FAILURE)
 
-      if bucket != '':
-         try:
-            s3_con.delete_bucket(s3_bucket_obj)
-         except BotoServerError, error:
-            syslog.syslog(syslog.LOG_INFO, 'Unable to delete S3 bucket "%s": %s, %s' % (bucket, error.reason, error.body))
-            pass
+         # Remove the data from S3
+         if key != '':
+            try:
+               if s3_bucket_obj == None:
+                  syslog.syslog(syslog.LOG_ERR, 'Error: Unable to access S3 to clean up data in S3 bucket %s' % bucket)
+                  sys.stderr.write('Error: Unable to access S3 to clean up data in S3 bucket %s\n' % bucket)
+                  return(FAILURE)
+               else:
+                  s3_key_obj = s3_bucket_obj.get_key(key.upper())
+                  s3_bucket_obj.delete_key(s3_key_obj)
+            except BotoServerError, error:
+               syslog.syslog(syslog.LOG_ERR, 'Error: Unable to delete S3 key "%s": %s, %s' % (key, error.reason, error.body))
+               return(FAILURE)
+      else:
+         syslog.syslog(syslog.LOG_INFO, 'Error: No S3 bucket defined')
+         return(FAILURE)
 
    return(ret_val)
 

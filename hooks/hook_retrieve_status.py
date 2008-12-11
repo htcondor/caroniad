@@ -54,11 +54,14 @@ def main(argv=None):
       if attribute.lower() == 'jobstatus':
          current_job_status = value
          continue
+      if attribute.lower() == 'amazonfullsqsqueuename':
+         queue_name = value
+         continue
 
    # Get the specified Amazon key information
    if os.path.exists(aws_key) == False or os.path.exists(aws_secret) == False:
-      syslog.syslog(syslog.LOG_ERR, 'ERROR: File %s not found' % aws_key)
-      print 'ERROR: File %s not found' % aws_key
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to read AWS key files')
+      sys.stderr.write('Error: Unable to read AWS key files')
       return(FAILURE)
    else:
       key_file = open(aws_key, 'r')
@@ -69,11 +72,23 @@ def main(argv=None):
       key_file.close()
 
    # Cycle through the results looking for info on the supplied class ad
-   sqs_con = SQSConnection(aws_key_val, aws_secret_val)
-   sqs_queue_name = '%s-%s' % (str(aws_key_val), 'condor_status_queue')
-   sqs_queue = sqs_con.create_queue(sqs_queue_name)
+   try:
+      sqs_con = SQSConnection(aws_key_val, aws_secret_val)
+   except:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to connect to SQS')
+      sys.stderr.write('Error: Unable to connect to SQS\n')
+      return(FAILURE)
+      
+   sqs_queue_name = '%s-%s-status' % (str(aws_key_val), queue_name)
+   try:
+      sqs_queue = sqs_con.create_queue(sqs_queue_name)
+      q_msg = sqs_queue.read(60)
+   except:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to access SQS queue "%s"' % sqs_queue_name)
+      sys.stderr.write('Error: Unable to access SQS queue "%s"\n' % sqs_queue_name)
+      return(FAILURE)
+
    job_complete_found = 0
-   q_msg = sqs_queue.read(60)
    msg_list = {}
    while q_msg != None:
       try:

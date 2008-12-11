@@ -24,7 +24,6 @@ import threading
 import signal
 import getopt
 import tarfile
-import random
 import base64
 from subprocess import *
 from jobhooks.functions import *
@@ -241,7 +240,7 @@ def lease_monitor(msg_list, max_lease_time, interval, log):
                msg_list.remove_work(msg_id)
 
                # Release the message so it can be consumed by another process
-               item.SQS_msg.change_visibility(1)
+               item.SQS_msg.change_visibility(5)
 
                # Need to unlock the item because the remove_work locks it
                item.unlock(False)
@@ -305,14 +304,20 @@ def handle_get_work(req_socket, reply, queue, known_items, log):
 
       # Get the work off the SQS work queue if it exists
       valid_message = 0
-      q_msg = queue.read(10)
+      try:
+         q_msg = queue.read(10)
+      except:
+         raise general_exception(syslog.LOG_ERR, 'Error: Unable to get a job from from SQS')
       while valid_message == 0 and q_msg != None:
          try:
             msg = pickle.loads(q_msg.get_body())
             valid_message = 1
          except:
             # This is an invalid message, so ignore it and look for others.
-            q_msg = queue.read(10)
+            try:
+               q_msg = queue.read(10)
+            except:
+               raise general_exception(syslog.LOG_ERR, 'Erorr: Unable to jobs from SQS')
 
       if q_msg != None:
          reply.data = msg.class_ad
@@ -383,8 +388,8 @@ def handle_get_work(req_socket, reply, queue, known_items, log):
          # known work was rejected.  Release the message and make sure the
          # job won't be processed
          if log == True:
-            print '%s: Adding job to list of work rejected.  Already processing %s job(s)' % (func_name, known_items.get_total_jobs_running())
-         q_msg.change_visibility(1)
+            print '%s: Adding job to list of work was rejected.  Already processing %s job(s)' % (func_name, known_items.get_total_jobs_running())
+         q_msg.change_visibility(5)
          reply.data = ''
    
       # Send the work to the requesting client
@@ -455,11 +460,15 @@ def handle_reply_fetch(msg, queue, known_items, log):
             response.class_ad = result_ad
 
             # Send the results to the appropriate SQS queue
-            queue.write(Message(body=pickle.dumps(response)))
+            try:
+               queue.write(Message(body=pickle.dumps(response)))
+            except:
+               saved_work.unlock()
+               raise general_exception(syslog.LOG_ERR, 'Error: Unable to write reply message to SQS')
 
             if msg.type == condor_wf_types.reply_claim_reject:
                # Reset the visibility timer so it can be read again quickly.
-               saved_work.SQS_msg.change_visibility(1)
+               saved_work.SQS_msg.change_visibility(5)
          finally:
             if log == True:
                print '%s: Releasing lock on %s' % (func_name, str(message_id))
@@ -504,14 +513,25 @@ def handle_prepare_job(req_socket, reply, s3_storage, known_items, log):
             msg = pickle.loads(saved_work.SQS_msg.get_body())
             if msg.s3_bucket != None and msg.s3_key != None:
                # Retrive the S3 key from the message
-               s3_bucket = s3_storage.get_bucket(msg.s3_bucket)
-               s3_key = Key(s3_bucket)
+               try:
+                  s3_bucket = s3_storage.get_bucket(msg.s3_bucket)
+                  s3_key = Key(s3_bucket)
+               except:
+                  saved_work.SQS_msg.change_visibility(5)
+                  saved_work.unlock()
+                  raise general_exception(syslog.LOG_ERR, 'Error: Unable to access S3 to prepare job for execution')
                s3_key.key = msg.s3_key
 
                # Retrieve the archived file from S3 and put it into the 
                # directory for the job
                input_filename = work_cwd + '/data.tar.gz'
-               s3_key.get_contents_to_filename(input_filename)
+               try:
+                  s3_key.get_contents_to_filename(input_filename)
+               except:
+                  saved_work.SQS_msg.change_visibility(5)
+                  saved_work.unlock()
+                  raise general_exception(syslog.LOG_ERR, 'Error: Unable to get job data from S3')
+                  
                reply.data = input_filename
             else:
                reply.data = ''
@@ -578,10 +598,12 @@ def handle_update_job_status(msg, queue, known_items, log):
 
             response = pickle.loads(saved_work.SQS_msg.get_body())
             response.class_ad = result_ad
-#            response.class_ad = msg.data
 
             # Send the results to the appropriate SQS queue
-            queue.write(Message(body=pickle.dumps(response)))
+            try:
+               queue.write(Message(body=pickle.dumps(response)))
+            except:
+               syslog.syslog(syslog.LOG_WARNING, 'Warning: Unable to write status message to SQS')
          finally:
             if log == True:
                print '%s: Releasing lock on %s' % (func_name, str(message_id))
@@ -648,11 +670,12 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
             if results.s3_key != None:
                s3_key = s3_bucket.get_key(results.s3_key)
             else:
-               random.seed()
-               rand_num = random.randint(1, 100000)
+               match = grep('^GlobalJobId\s*=\s*"(.+)"$', msg.data)
+               if match != None and match[0] != None:
+                  global_id = match[0]
                aws_access_key = s3_storage.aws_access_key_id
                s3_key = Key(s3_bucket)
-               s3_key.key = str(aws_access_key) + '-' + str(rand_num)
+               s3_key.key = str(aws_access_key) + '-' + str(global_id)
                results.s3_key = s3_key.key
 
             # Create the list of files to put into the results archive
@@ -730,10 +753,29 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
                results.class_ad = result_ad
 
                # Upload the sandbox to S3
-               s3_key.set_contents_from_filename(results_filename)
+               try:
+                  s3_key.set_contents_from_filename(results_filename)
+               except:
+                  # Reset the visibility timer so it can be read again quickly.
+                  known_items.remove_work(message_id)
+                  saved_work.SQS_msg.change_visibility(5)
+                  saved_work.unlock()
+                  raise general_exception(syslog.LOG_ERR, 'Error: Unable to write results to S3')
 
                # Remove the message from the SQS queue
-               work_q.delete_message(saved_work.SQS_msg)
+               try:
+                  work_q.delete_message(saved_work.SQS_msg)
+               except:
+                  # Don't raise an exception here because the job has completed
+                  # processing, but SQS is having issues.  The system shutdown
+                  # will prevent it from being run again
+                  saved_work.unlock()
+                  syslog.syslog(syslog.LOG_ERR, 'Error: Unable to delete SQS message')
+
+               # Check if a shutdown delay was defined
+               delay = grep('^amazonamishutdowndelay\s*=\s*(.*)$', result_ad)
+               if delay != None and delay[0] != None:
+                  time.sleep(int(delay[0]) * 60)
 
                # Shutdown now that the job has finished
                call(['shutdown',  '-h',  '-P',  'now'])
@@ -743,10 +785,19 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
                   print '%s: Not normal exit: %s' % (func_name, str(msg.type))
 
                # Reset the visibility timer so it can be read again quickly.
-               saved_work.SQS_msg.change_visibility(1)
+               known_items.remove_work(message_id)
+               saved_work.SQS_msg.change_visibility(5)
+               saved_work.unlock()
          finally:
             # Send the results to the appropriate SQS queue
-            results_q.write(Message(body=pickle.dumps(results)))
+            try:
+               results_q.write(Message(body=pickle.dumps(results)))
+            except:
+               # Reset the visibility timer so it can be read again quickly.
+               saved_work.SQS_msg.change_visibility(5)
+               saved_work.unlock()
+               known_items.remove_work(message_id)
+               raise general_exception(syslog.LOG_ERR, 'Error: Unable to write job results message to SQS')
             saved_work.unlock()
 
       # Send acknowledgement to the originator that exit work is complete
@@ -846,17 +897,20 @@ def main(argv=None):
       # Create a container to share data between threads
       share_data = global_data()
 
-      # Open a connection to the AWS SQS service
-      sqs_connection = SQSConnection(access_key, secret_key)
+      try:
+         # Open a connection to the AWS SQS service
+         sqs_connection = SQSConnection(access_key, secret_key)
 
-      # Create the work queue if it doesn't exist
-      work_queue = sqs_connection.create_queue('%s-%s' % (str(access_key), queue_name))
+         # Create the work queue if it doesn't exist
+         work_queue = sqs_connection.create_queue('%s-%s' % (str(access_key), str(queue_name)))
 
-      # Create the status queue if it doesn't exist
-      status_queue = sqs_connection.create_queue('%s-%s' % (str(access_key), 'condor_status_queue'))
+         # Create the status queue if it doesn't exist
+         status_queue = sqs_connection.create_queue('%s-%s-status' % (str(access_key), str(queue_name)))
 
-      # Open a connection to the AWS S3 service
-      s3_connection = S3Connection(access_key, secret_key)
+         # Open a connection to the AWS S3 service
+         s3_connection = S3Connection(access_key, secret_key)
+      except:
+         call(['shutdown',  '-h',  '-P',  'now'])
 
       # Create a thread to monitor work expiration times
       monitor_thread = threading.Thread(target=lease_monitor, args=(share_data, sqs_config['lease_time'], sqs_config['lease_check_interval'], debug_logging))
@@ -899,9 +953,6 @@ def main(argv=None):
               condor_msg.type == condor_wf_types.exit_hold or \
               condor_msg.type == condor_wf_types.exit_evict:
             child = threading.Thread(target=handle_exit, args=(sock, condor_msg, s3_connection, work_queue, status_queue, share_data, debug_logging))
-            # Only handle 1 job, and it has completed so close the listen
-            # socket
-            shutdown_sockets(listen_socket, None)
          else:
             syslog.syslog(syslog.LOG_WARNING, 'Received unknown request: %d' % condor_msg.type)
             continue

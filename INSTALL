@@ -183,6 +183,7 @@ transfer_executable = false
 +WantAWS = True
 +WantArch = "INTEL" 
 +WantCPUs = 1
++JobShouldBeSandboxed = True
 queue
 
 It is important to note that it is likely that the Requirements attribute
@@ -221,6 +222,12 @@ WantDisk
 
     Designates the amount of Disk space desired for the job.  Value is in in
     Gigabytes, so 100 == 100 Gigabytes of disk space.
+
+JobShouldBeSandboxed
+    Values: True or False
+
+    Determines if the job's input and output files should be spooled.  Should
+    always be set to True.
 
 The submit file can provide user credentials for accessing EC2 if the site
 administrator has not configured credientials for that submit machine by

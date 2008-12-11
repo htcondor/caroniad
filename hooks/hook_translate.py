@@ -17,7 +17,6 @@ import sys
 import os
 import syslog
 import re
-import random
 import pickle
 import tarfile
 import base64
@@ -57,6 +56,7 @@ def main(argv=None):
    bucket_id = ''
    queue_name = ''
    rsa_public_key = ''
+   global_id = ''
 
    # Parse the route information from stdin.
    route = grep('^\[\s*(.*)\s*\]$', sys.stdin.readline())[0]
@@ -86,8 +86,6 @@ def main(argv=None):
          if attribute.lower() == 'set_rsapublickey':
             rsa_public_key = value
             continue
-
-   sqs_data.class_ad += 'AmazonSQSQueueName = "%s"\n' % queue_name
 
    # Read the original class ad from stdin and store it for submission
    # to SQS.  Additionally, convert it to an EC2 classad for output
@@ -122,6 +120,8 @@ def main(argv=None):
             if rsa_public_key == '':
                user_rsa_public_key = grep('^"(.*)"$', value)[0]
             continue
+         if attribute.lower() == 'globaljobid':
+            global_id = grep('^"(.*)"$', value)[0].replace('#', '').replace('@', '').replace('.', '')
          if attribute.lower() in skip_attribs:
             continue
          sqs_data.class_ad += str(line)
@@ -151,6 +151,10 @@ def main(argv=None):
          if attribute.lower() == 'cmd' or attribute.lower() == 'command':
             executable = value
       grid_classad += str(line)
+
+   job_queue = '%s-%s' % (queue_name, global_id)
+   sqs_data.class_ad += 'AmazonFullSQSQueueName = "%s"\n' % job_queue
+   grid_classad += 'AmazonFullSQSQueueName = "%s"\n' % job_queue
 
    # Search through the class ad and make modifications to the files/paths
    # as necessary
@@ -239,8 +243,8 @@ def main(argv=None):
    # Pull the specific keys out of the files
    if os.path.exists(aws_key_file) == False or \
       os.path.exists(aws_secret_file) == False:
-      syslog.syslog(syslog.LOG_ERR, 'ERROR: File %s not found' % aws_key_file)
-      print 'ERROR: File %s not found' % aws_key_file
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to read AWS key files')
+      sys.stderr.write('Error: Unable to read AWS key files')
       return(FAILURE)
    else:
       key_file = open(aws_key_file, 'r')
@@ -249,7 +253,7 @@ def main(argv=None):
       key_file = open(aws_secret_file, 'r')
       aws_secret_val = key_file.readlines()[0].rstrip()
       key_file.close()
-   sqs_queue_name = '%s-%s' % (str(aws_key_val), queue_name)
+   sqs_queue_name = '%s-%s' % (str(aws_key_val), job_queue)
 
    # Encode the secret key
    val = popen2('openssl rsautl -inkey "%s" -pubin -encrypt' % rsa_public_key_file)
@@ -260,16 +264,27 @@ def main(argv=None):
    file = open(aws_filename, 'w')
    file.write(aws_key_val + '\n')
    file.write(base64.encodestring(enc_key).replace('\n','') + '\n')
-   file.write(queue_name)
+   file.write(job_queue)
    file.close()
    sqs_data.class_ad += 'AmazonUserDataFile = "%s"\n' % str(aws_filename)
    grid_classad += 'AmazonUserDataFile = "%s"\n' % str(aws_filename)
 
    # Open the connection to Amazon's S3 and create a key input/output of
    # data
-   s3_con = S3Connection(aws_key_val, aws_secret_val)
+   try:
+      s3_con = S3Connection(aws_key_val, aws_secret_val)
+   except:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to connect to S3')
+      sys.stderr.write('Error: Unable to connect to S3\n')
+      return(FAILURE)
+      
    s3_bucket_name = '%s-%s' % (str(aws_key_val), bucket_id)
-   s3_bucket = s3_con.create_bucket(s3_bucket_name)
+   try:
+      s3_bucket = s3_con.create_bucket(s3_bucket_name)
+   except:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to create S3 bucket "%s"' % s3_bucket_name)
+      sys.stderr.write('Error: Unable to create S3 bucket "%s"\n' % s3_bucket_name)
+      return(FAILURE)
    sqs_data.s3_bucket = s3_bucket_name
    grid_classad += 'S3BucketID = "%s"\n' % s3_bucket_name
 
@@ -285,26 +300,52 @@ def main(argv=None):
          data_files.addfile(tar_obj, file_obj)
          file_obj.close()
       data_files.close()
-      random.seed()
-      rand_num = random.randint(1, max_key_id)
       s3_key = Key(s3_bucket)
       if s3_key == None:
          syslog.syslog(syslog.LOG_ERR, 'Error: Unable to access S3 to set job data in S3 bucket %s' % s3_bucket_name)
-         print 'Error: Unable to access S3 to set job data in S3 bucket %s' % s3_bucket_name
+         sys.stderr.write('Error: Unable to access S3 to set job data in S3 bucket %s\n' % s3_bucket_name)
          os.remove(tarfile_name)
          return(FAILURE)
       else:
-         s3_key.key = str(aws_key_val) + '-' + str(rand_num)
+         s3_key.key = str(aws_key_val) + '-' + str(global_id)
          sqs_data.s3_key = s3_key.key
-         s3_key.set_contents_from_filename(tarfile_name)
+         try:
+            s3_key.set_contents_from_filename(tarfile_name)
+         except:
+            syslog.syslog(syslog.LOG_ERR, 'Error: Unable place job data files into S3 bucket %s, key %s' % (s3_bucket_name, s3_key.key))
+            sys.stderr.write('Error: Unable place job data files into S3 bucket %s, key %s\n' % (s3_bucket_name, s3_key.key))
+            os.remove(tarfile_name)
+            return(FAILURE)
+         
          os.remove(tarfile_name)
          grid_classad += 'S3KeyID = "%s"\n' % s3_key.key
 
    # Put the original class ad into Amazon's SQS
    message = Message(body=pickle.dumps(sqs_data))
-   sqs_con = SQSConnection(aws_key_val, aws_secret_val)
-   sqs_queue = sqs_con.create_queue(sqs_queue_name)
-   sqs_queue.write(message)
+   try:
+      sqs_con = SQSConnection(aws_key_val, aws_secret_val)
+   except:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to connect to SQS')
+      sys.stderr.write('Error: Unable to connect to SQS\n')
+      try:
+         s3_bucket.delete_key(s3_key)
+      except:
+         syslog.syslog(syslog.LOG_ERR, 'Error: Unable to remove job data from S3')
+         sys.stderr.write('Error: Unable to remove job data from S3\n')
+      return(FAILURE)
+
+   try:
+      sqs_queue = sqs_con.create_queue(sqs_queue_name)
+      sqs_queue.write(message)
+   except:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to write job to SQS queue "%s"' % sqs_queue_name)
+      sys.stderr.write('Error: Unable to write job to SQS queue "%s"\n' % sqs_queue_name)
+      try:
+         s3_bucket.delete_key(s3_key)
+      except:
+         syslog.syslog(syslog.LOG_ERR, 'Error: Unable to remove job data from S3')
+         sys.stderr.write('Error: Unable to remove job data from S3\n')
+      return(FAILURE)
    grid_classad += 'SQSMessageId = "' + str(message.id) + '"\n'
 
    # Print the Converted Amazon job to stdout

@@ -1,7 +1,7 @@
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
 Version: 1.0
-Release: 5%{?dist}
+Release: 6%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -66,6 +66,13 @@ fi
 %_sbindir/caroniad
 
 %changelog
+* Wed Dec 10 2008  <rrati@redhat> - 1.0-6
+- Use GlobalJobId as part of unique S3 key
+- Each job gets unique results and request queues
+- AMI will shutdown if it has problems accessing AWS on startup
+- Gracefully handle AWS access issues
+- Look for shutdown timer in job ad, and if it exists wait to shutdown
+
 * Tue Dec  9 2008  <rrati@redhat> - 1.0-5
 - Fixed JobStatus and Owner reporting issues
 - AMI is now shutdown after exit message sent
