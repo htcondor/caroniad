@@ -115,7 +115,8 @@ def main(argv=None):
       try:
          work_queue = sqs_con.create_queue('%s-%s' % (str(aws_key_val), queue_name))
       except BotoServerError, error:
-         syslog.syslog(syslog.LOG_ERR, 'Error: %s, %s' % (error.reason, error.body))
+         syslog.syslog(syslog.LOG_ERR, 'Error: Unable to connect to SQS: %s, %s' % (error.reason, error.body))
+         sys.stderr.write('Error: Unable to connect to SQS: %s, %s\n' % (error.reason, error.body))
          return(FAILURE)
 
       try:
@@ -199,6 +200,7 @@ def main(argv=None):
             s3_bucket_obj = s3_con.create_bucket(bucket)
          except BotoServerError, error:
             syslog.syslog(syslog.LOG_ERR, 'Error accessing S3: %s, %s' % (error.reason, error.body))
+            sys.stderr.write('Error accessing S3: %s, %s\n' % (error.reason, error.body))
             return(FAILURE)
 
          # Remove the data from S3
@@ -213,9 +215,11 @@ def main(argv=None):
                   s3_bucket_obj.delete_key(s3_key_obj)
             except BotoServerError, error:
                syslog.syslog(syslog.LOG_ERR, 'Error: Unable to delete S3 key "%s": %s, %s' % (key, error.reason, error.body))
+               sys.stderr.write('Error: Unable to delete S3 key "%s": %s, %s\n' % (key, error.reason, error.body))
                return(FAILURE)
       else:
          syslog.syslog(syslog.LOG_INFO, 'Error: No S3 bucket defined')
+         sys.stderr.write('Error: No S3 bucket defined\n')
          return(FAILURE)
 
    return(ret_val)

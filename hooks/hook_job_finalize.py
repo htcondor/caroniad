@@ -89,10 +89,13 @@ def main(argv=None):
       if s3_key_obj != None:
          s3_key_obj.get_contents_to_filename(results_filename)
       else:
-         syslog.syslog(syslog.LOG_ERR, 'Unable to find S3 key "%s" in S3 bucket "%s"' % (key, bucket))
+         syslog.syslog(syslog.LOG_ERR, 'Error: Unable to find S3 key "%s" in S3 bucket "%s"' % (key, bucket))
+         sys.stderr.write('Error: Unable to find S3 key "%s" in S3 bucket "%s"\n' % (key, bucket))
          return(FAILURE)
    except BotoServerError, error:
       syslog.syslog(syslog.LOG_ERR, 'Error accessing S3: %s, %s' % (error.reason, error.body))
+      sys.stderr.write('Error accessing S3: %s, %s\n' % (error.reason, error.body))
+      return(FAILURE)
    tarball_extract(results_filename)
    if os.path.exists(results_filename):
       os.remove(results_filename)
