@@ -626,6 +626,7 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
    transfer_file_attribs = ['Err', 'Out', 'TransferOutput']
    file_list = []
    remove_attribs = ['iwd', 'owner']
+   normal_exit = 0
 
    try:
       # Determine the slot that is reporting results
@@ -708,6 +709,7 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
             os.chdir(orig_cwd)
 
             if msg.type == condor_wf_types.exit_exit:
+               normal_exit = 1
                # Job exited normally, so upload the sandbox to S3,
                # and remove the message on the SQS work queue
                if log == True:
@@ -771,14 +773,6 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
                   # will prevent it from being run again
                   saved_work.unlock()
                   syslog.syslog(syslog.LOG_ERR, 'Error: Unable to delete SQS message')
-
-               # Check if a shutdown delay was defined
-               delay = grep('^amazonamishutdowndelay\s*=\s*(.*)$', result_ad)
-               if delay != None and delay[0] != None:
-                  time.sleep(int(delay[0]) * 60)
-
-               # Shutdown now that the job has finished
-               call(['shutdown',  '-h',  '-P',  'now'])
             else:
                # Job didn't exit normally
                if log == True:
@@ -799,6 +793,15 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
                known_items.remove_work(message_id)
                raise general_exception(syslog.LOG_ERR, 'Error: Unable to write job results message to SQS')
             saved_work.unlock()
+
+            if normal_exit == 1:
+               # Check if a shutdown delay was defined
+               delay = grep('^amazonamishutdowndelay\s*=\s*(.*)$', result_ad)
+               if delay != None and delay[0] != None:
+                  time.sleep(int(delay[0]) * 60)
+
+               # Shutdown now that the job has finished
+               call(['shutdown',  '-h',  '-P',  'now'])
 
       # Send acknowledgement to the originator that exit work is complete
       req_socket.send('Completed')

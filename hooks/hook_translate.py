@@ -61,10 +61,14 @@ def main(argv=None):
    # Parse the route information from stdin.
    route = grep('^\[\s*(.*)\s*\]$', sys.stdin.readline())[0]
    for line in route.split(';'):
-      match = grep('^(.*)\s*=\s*"(.*)"$', line.lstrip())
+      match = grep('^(.*)\s*=\s*(.*)$', line.lstrip())
       if match != None and match[0] != None and match[1] != None:
          attribute = match[0].rstrip()
-         value = match[1].rstrip()
+         val_match = grep('^"(.*)"$', match[1].rstrip())
+         if val_match != None and val_match[0] != None:
+            value = val_match[0].rstrip().lstrip()
+         else:
+            value = match[1].rstrip().lstrip()
          if attribute.lower() == 'set_amazonpublickey':
             aws_public_key = value
             continue
@@ -85,6 +89,9 @@ def main(argv=None):
             continue
          if attribute.lower() == 'set_rsapublickey':
             rsa_public_key = value
+            continue
+         if attribute.lower() == 'set_amazonamishutdowndelay':
+            delay = value
             continue
 
    # Read the original class ad from stdin and store it for submission
@@ -154,6 +161,7 @@ def main(argv=None):
 
    job_queue = '%s-%s' % (queue_name, global_id)
    sqs_data.class_ad += 'AmazonFullSQSQueueName = "%s"\n' % job_queue
+   sqs_data.class_ad += 'amazonamishutdowndelay = %s\n' % delay
    grid_classad += 'AmazonFullSQSQueueName = "%s"\n' % job_queue
 
    # Search through the class ad and make modifications to the files/paths
