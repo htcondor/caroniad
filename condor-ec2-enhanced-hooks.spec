@@ -66,11 +66,15 @@ touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
 %{python_sitelib}/ec2enhanced/__init__.py*
 
 %changelog
-* Wed Dec 10 2008  <rrati@redhat> - 1.0-7
+* Sat Dec 13 2008  <rrati@redhat> - 1.0-7
 - Use GlobalJobId a part of unique S3 key
 - Handle more failure conditions when accessing AWS
 - Errors are printed to stderr
 - Read results from unique queue per job
+- Simplication of hooks since queues are now unique
+- Clean hook ensures all information has been remove from AWS
+- Finalize hook failure will force job to be re-routed
+- Translate hook now uses AmazonUserData instead of AmazonUserDataFile
 
 * Tue Dec  9 2008  <rrati@redhat> - 1.0-6
 - S3 data is stored in unique buckets

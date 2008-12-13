@@ -36,25 +36,49 @@ def main(argv=None):
    aws_key = ''
    aws_secret = ''
    s3_bucket_obj = ''
+   ec2_success = False
+   ret_val = SUCCESS
 
-   # Read the class ad from stdin and store the S3 information
+   # Read the source class ad from stdin and store it as well as the
+   # job status.  The end of the source job is noted by '------'
    for line in sys.stdin:
-      match = grep('^(.*)\s*=\s*"(.*)"$', line.lstrip())
+      if line.rstrip() == '------':
+         break
+
+   # Read the routed class ad from stdin and store the S3 information and
+   # the job status
+   for line in sys.stdin:
+      match = grep('^(.*)\s*=\s*(.*)$', line.lstrip())
       if match != None and match[0] != None and match[1] != None:
          attribute = match[0].rstrip()
-         value = match[1].rstrip()
-      if attribute.lower() == 's3bucketid':
-         bucket = value
-         continue
-      if attribute.lower() == 's3keyid':
-         key = value
-         continue
-      if attribute.lower() == 'amazonaccesskey':
-         aws_key = value
-         continue
-      if attribute.lower() == 'amazonsecretkey':
-         aws_secret = value
-         continue
+         val_match = grep('^"(.*)"$', match[1].rstrip())
+         if val_match != None and val_match[0] != None:
+            value = val_match[0].rstrip().lstrip()
+         else:
+            value = match[1].rstrip().lstrip()
+         if attribute.lower() == 's3bucketid':
+            bucket = value
+            continue
+         if attribute.lower() == 's3keyid':
+            key = value
+            continue
+         if attribute.lower() == 'amazonaccesskey':
+            aws_key = value
+            continue
+         if attribute.lower() == 'amazonsecretkey':
+            aws_secret = value
+            continue
+         if attribute.lower() == 'ec2jobsuccessful':
+            ec2_success = value
+            continue
+
+   # If the source job is not in the completed state, but the routed job is
+   # then there was a failure running the AMI.  Exit with status 2 so the
+   # job will be re-routed.
+   if ec2_success == False:
+      syslog.syslog(syslog.LOG_INFO, 'The job did not complete.  Forcing the job to be routed again')
+      sys.stderr.write('The job did not complete.  Forcing the job to be routed again\n')
+      return(FAILURE)
 
    # Pull the specific keys out of the files
    if os.path.exists(aws_key) == False or os.path.exists(aws_secret) == False:
@@ -75,6 +99,8 @@ def main(argv=None):
       os.chdir(spool_dir)
    except:
       syslog.syslog(syslog.LOG_ERR, 'Unable to chdir to "%s"' % spool_dir)
+      sys.stderr.write('Unable to chdir to "%s"\n' % spool_dir)
+      return(FAILURE)
 
    try:
       s3_con = S3Connection(aws_key_val, aws_secret_val)
@@ -96,7 +122,14 @@ def main(argv=None):
       syslog.syslog(syslog.LOG_ERR, 'Error accessing S3: %s, %s' % (error.reason, error.body))
       sys.stderr.write('Error accessing S3: %s, %s\n' % (error.reason, error.body))
       return(FAILURE)
-   tarball_extract(results_filename)
+
+   try:
+      tarball_extract(results_filename)
+   except:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to extract results file')
+      sys.stderr.write('Error: Unable to extract results file')
+      return(FAILURE)
+
    if os.path.exists(results_filename):
       os.remove(results_filename)
 

@@ -268,14 +268,8 @@ def main(argv=None):
    val[1].write(aws_secret_val)
    val[1].close()
    enc_key = val[0].read().rstrip()
-   aws_filename = '/tmp/aws-keys-' + str(os.getpid())
-   file = open(aws_filename, 'w')
-   file.write(aws_key_val + '\n')
-   file.write(base64.encodestring(enc_key).replace('\n','') + '\n')
-   file.write(job_queue)
-   file.close()
-   sqs_data.class_ad += 'AmazonUserDataFile = "%s"\n' % str(aws_filename)
-   grid_classad += 'AmazonUserDataFile = "%s"\n' % str(aws_filename)
+   aws_user_data = '%s|%s|%s' % (aws_key_val, base64.encodestring(enc_key).replace('\n',''), job_queue)
+   grid_classad += 'AmazonUserData = "%s"\n' % aws_user_data
 
    # Open the connection to Amazon's S3 and create a key input/output of
    # data

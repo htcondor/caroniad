@@ -14,14 +14,8 @@ from boto.s3.key import Key
 from ec2enhanced.functions import SQSEntry
 from jobhooks.functions import *
 
-# Read the Amazon AWS information from condor_config
-process = Popen(['cat', '/home/rsquared/.ec2/access_key'], stdout=PIPE)
-aws_key_val = process.communicate()[0].rstrip()
-process = Popen(['cat', '/home/rsquared/.ec2/secret_access_key'], stdout=PIPE)
-aws_secret_val = process.communicate()[0].rstrip()
-
 # Connect to S3 and delete all buckets except for ec2_enhanced
-s3_con = S3Connection(aws_key_val, aws_secret_val)
+s3_con = S3Connection()
 buckets = s3_con.get_all_buckets()
 for bucket in buckets:
    print "Examining bucket: " + bucket.name

@@ -66,7 +66,7 @@ fi
 %_sbindir/caroniad
 
 %changelog
-* Wed Dec 10 2008  <rrati@redhat> - 1.0-6
+* Sat Dec 13 2008  <rrati@redhat> - 1.0-6
 - Use GlobalJobId as part of unique S3 key
 - Each job gets unique results and request queues
 - AMI will shutdown if it has problems accessing AWS on startup

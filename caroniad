@@ -847,7 +847,7 @@ def main(argv=None):
          # Send message about startup failure
          raise general_exception(syslog.LOG_ERR, "No User Data")
       else:
-         user_data = user_data.split('\n')
+         user_data = user_data.split('|')
 
       if daemon_mode == 1:
          try:
