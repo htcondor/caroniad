@@ -1,7 +1,7 @@
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
 Version: 1.0
-Release: 6%{?dist}
+Release: 7%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -66,6 +66,14 @@ fi
 %_sbindir/caroniad
 
 %changelog
+* Mon Dec 15 2008  <rrati@redhat> - 1.0-7
+- Daemon no longer returns files created outside the job's iwd
+- Upon exit, reset visibility timeout for jobs that haven't finished
+- Attempt to access AWS multiple times before shutting down the AMI
+- Only package files in the job's iwd
+- If TransferOutput is set, only transfer the files listed as well as
+  stdout/stderr files if they exist
+
 * Sat Dec 13 2008  <rrati@redhat> - 1.0-6
 - Use GlobalJobId as part of unique S3 key
 - Each job gets unique results and request queues

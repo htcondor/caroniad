@@ -114,7 +114,12 @@ def main(argv=None):
    
             # Grab the S3 bucket if it wasn't in the input classad
             if bucket == '':
-               bucket = q_msg.s3_bucket
+               try:
+                  bucket = q_msg.s3_bucket
+               except:
+                  # Message had no s3_bucket for some reason.
+                  sys.stderr.write('Error: Message has no S3 bucket\n')
+                  ret_val = FAILURE
    
             # Grab the S3 key if it wasn't defined already
             if key == '':

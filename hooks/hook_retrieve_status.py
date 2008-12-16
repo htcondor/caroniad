@@ -33,6 +33,8 @@ def main(argv=None):
    aws_secret = ''
    queue_name = ''
    current_job_status = 1
+   update_skip_attribs = ['jobstatus', 'imagesize', 'enteredcurrentstatus',
+                          'jobstartdate']
 
    for line in sys.stdin:
       match = grep('^(.*)\s*=\s*"(.*)"$', line.lstrip())
@@ -65,7 +67,7 @@ def main(argv=None):
       aws_secret_val = key_file.readlines()[0].rstrip()
       key_file.close()
 
-   # Cycle through the results looking for info on the supplied class ad
+   # Look for an update
    try:
       sqs_con = SQSConnection(aws_key_val, aws_secret_val)
    except:
@@ -111,12 +113,22 @@ def main(argv=None):
             # We found an update that indicates the job completed.
             # Add a marker to the classad saying the job has completed.
             status_classad += 'EC2JobSuccessful = True\n'
+         else:
+            # Remove the message from the queue only if it's not the success
+            # message
+            sqs_queue.delete_message(q_msg)
 
-         # Remove the message from the queue
-         sqs_queue.delete_message(q_msg)
+         # Remove unwanted attributes from the update
+         final_classad = ''
+         for line in status_classad.split('\n'):
+            match = grep('^(.*)\s*=.*$', line.lstrip())
+            if match != None and match[0] != None and \
+               match[0].rstrip().lower() in update_skip_attribs:
+               continue
+            final_classad += '%s\n' % line
 
          # Print the update
-         print status_classad
+         print final_classad
 
    return(SUCCESS)
 

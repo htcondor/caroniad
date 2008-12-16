@@ -16,7 +16,8 @@
 import sys
 import os
 import syslog
-import re
+import tempfile
+import time
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 from boto.exception import *
@@ -30,12 +31,12 @@ def main(argv=None):
    # Open a connection to the system logger
    syslog.openlog(os.path.basename(argv[0]))
 
-   # Get the spool directory
-   spool_dir = sys.argv[1]
-
    aws_key = ''
    aws_secret = ''
    s3_bucket_obj = ''
+   stdout = ''
+   stderr = ''
+   remaps = ''
    ec2_success = False
    ret_val = SUCCESS
 
@@ -44,6 +45,26 @@ def main(argv=None):
    for line in sys.stdin:
       if line.rstrip() == '------':
          break
+      match = grep('^(.*)\s+=\s+(.*)$', line.lstrip())
+      if match != None and match[0] != None and match[1] != None:
+         attribute = match[0].rstrip()
+         val_match = grep('^"(.*)"$', match[1].rstrip())
+         if val_match != None and val_match[0] != None:
+            value = val_match[0].rstrip().lstrip()
+         else:
+            value = match[1].rstrip().lstrip()
+         if attribute.lower() == 'iwd':
+            iwd = value
+            continue
+         if attribute.lower() == 'transferoutputremaps':
+            remaps = value
+            continue
+         if attribute.lower() == 'out' and value.lower() != '_condor_stdout':
+            stdout = value
+            continue
+         if attribute.lower() == 'err' and value.lower() != '_condor_stderr':
+            stderr = value
+            continue
 
    # Read the routed class ad from stdin and store the S3 information and
    # the job status
@@ -95,32 +116,47 @@ def main(argv=None):
 
    # Access S3 and extract the data into the staging area
    results_filename = 'results.tar.gz'
+   temp_dir = tempfile.mkdtemp(suffix=str(os.getpid()))
    try:
-      os.chdir(spool_dir)
+      os.chdir(temp_dir)
    except:
-      syslog.syslog(syslog.LOG_ERR, 'Unable to chdir to "%s"' % spool_dir)
-      sys.stderr.write('Unable to chdir to "%s"\n' % spool_dir)
+      syslog.syslog(syslog.LOG_ERR, 'Unable to chdir to "%s"' % iwd)
+      sys.stderr.write('Unable to chdir to "%s"\n' % iwd)
+      os.removedirs(temp_dir)
       return(FAILURE)
 
-   try:
-      s3_con = S3Connection(aws_key_val, aws_secret_val)
-      s3_bucket_obj = s3_con.get_bucket(bucket)
-      if s3_bucket_obj == None:
-         syslog.syslog(syslog.LOG_ERR, 'Error: Unable to access S3 to retrieve data from S3 bucket %s' % bucket)
-         sys.stderr.write('Error: Unable to access S3 to retrieve data from S3 bucket %s\n' % bucket)
-         return(FAILURE)
-      else:
-         s3_key_obj = s3_bucket_obj.get_key(key)
+   # Connect to S3
+   failed = 1
+   for attempt in range(1,5):
+      try:
+         s3_con = S3Connection(aws_key_val, aws_secret_val)
+         s3_bucket_obj = s3_con.get_bucket(bucket)
+         failed = 0
+         break
+      except BotoServerError, error:
+         syslog.syslog(syslog.LOG_ERR, 'Error accessing S3: %s, %s' % (error.reason, error.body))
+         sys.stderr.write('Error accessing S3: %s, %s\n' % (error.reason, error.body))
+         time.sleep(5)
+         pass
 
-      if s3_key_obj != None:
-         s3_key_obj.get_contents_to_filename(results_filename)
-      else:
-         syslog.syslog(syslog.LOG_ERR, 'Error: Unable to find S3 key "%s" in S3 bucket "%s"' % (key, bucket))
-         sys.stderr.write('Error: Unable to find S3 key "%s" in S3 bucket "%s"\n' % (key, bucket))
-         return(FAILURE)
-   except BotoServerError, error:
-      syslog.syslog(syslog.LOG_ERR, 'Error accessing S3: %s, %s' % (error.reason, error.body))
-      sys.stderr.write('Error accessing S3: %s, %s\n' % (error.reason, error.body))
+   if failed == 1:
+      os.removedirs(temp_dir)
+      return(FAILURE)
+
+   if s3_bucket_obj == None:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to access S3 to retrieve data from S3 bucket %s' % bucket)
+      sys.stderr.write('Error: Unable to access S3 to retrieve data from S3 bucket %s\n' % bucket)
+      os.removedirs(temp_dir)
+      return(FAILURE)
+   else:
+      s3_key_obj = s3_bucket_obj.get_key(key)
+
+   if s3_key_obj != None:
+      s3_key_obj.get_contents_to_filename(results_filename)
+   else:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to find S3 key "%s" in S3 bucket "%s"' % (key, bucket))
+      sys.stderr.write('Error: Unable to find S3 key "%s" in S3 bucket "%s"\n' % (key, bucket))
+      os.removedirs(temp_dir)
       return(FAILURE)
 
    try:
@@ -128,14 +164,29 @@ def main(argv=None):
    except:
       syslog.syslog(syslog.LOG_ERR, 'Error: Unable to extract results file')
       sys.stderr.write('Error: Unable to extract results file')
+      os.removedirs(temp_dir)
       return(FAILURE)
 
    if os.path.exists(results_filename):
       os.remove(results_filename)
 
+   # Place the extracted files in their proper locations, starting with the
+   # remaps
+   if remaps != '':
+      for remap in remaps.split(';'):
+         remap_info = remap.split('=')
+         if os.path.exists(remap_info[0]) == True:
+            os.rename(remap_info[0], remap_info[1])
+
+   for file in os.listdir('.'):
+      os.rename(file, '%s/%s' % (iwd, file))
+
    # Remove the data from S3
    if s3_bucket_obj != '':
       s3_bucket_obj.delete_key(s3_key_obj)
+
+   # Remove the temporary directory
+   os.removedirs(temp_dir)
 
    return(SUCCESS)
 

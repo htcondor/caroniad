@@ -57,6 +57,7 @@ def main(argv=None):
    queue_name = ''
    rsa_public_key = ''
    global_id = ''
+   delay = ''
 
    # Parse the route information from stdin.
    route = grep('^\[\s*(.*)\s*\]$', sys.stdin.readline())[0]
@@ -161,7 +162,8 @@ def main(argv=None):
 
    job_queue = '%s-%s' % (queue_name, global_id)
    sqs_data.class_ad += 'AmazonFullSQSQueueName = "%s"\n' % job_queue
-   sqs_data.class_ad += 'amazonamishutdowndelay = %s\n' % delay
+   if delay != '':
+      sqs_data.class_ad += 'amazonamishutdowndelay = %s\n' % delay
    grid_classad += 'AmazonFullSQSQueueName = "%s"\n' % job_queue
 
    # Search through the class ad and make modifications to the files/paths

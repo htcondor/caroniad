@@ -3,7 +3,7 @@
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
 Version: 1.0
-Release: 7%{?dist}
+Release: 8%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -66,6 +66,11 @@ touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
 %{python_sitelib}/ec2enhanced/__init__.py*
 
 %changelog
+* Mon Dec 15 2008  <rrati@redhat> - 1.0-8
+- The status hook outputs updates, not entire classads
+- The finalize hook does file remapping and places files in job's iwd
+- The finalize hook attempts to access AWS multiple times before quitting
+
 * Sat Dec 13 2008  <rrati@redhat> - 1.0-7
 - Use GlobalJobId a part of unique S3 key
 - Handle more failure conditions when accessing AWS

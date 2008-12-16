@@ -623,7 +623,6 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
    if log == True:
       print '%s called at %s' % (func_name, str(time.localtime()))
 
-   transfer_file_attribs = ['Err', 'Out', 'TransferOutput']
    file_list = []
    remove_attribs = ['iwd', 'owner']
    normal_exit = 0
@@ -682,14 +681,25 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
             # Create the list of files to put into the results archive
             orig_cwd = os.getcwd()
             os.chdir(work_cwd)
-            file_list += os.listdir(".")
-            for attrib in transfer_file_attribs:
-               match = grep('^' + attrib + '\s*=\s*"(.+)"$', msg.data)
-               if match != None and match[0] != None:
-                  for file in match[0].split(','):
-                     if file not in file_list:
-                        # Only add the file to the list if wasn't there already
-                        file_list.append(file)
+            transfer_files = grep('^TransferOutput\s*=\s*"(.*)"$', msg.data)
+            if transfer_files != None and transfer_files[0] != None:
+               if os.path.exists('_condor_stderr') == True:
+                  file_list.append('_condor_stderr')
+               else:
+                  err_file = grep('^Err\s+=\s+"(.*)"$', msg.data)
+                  if err_file != None and err_file[0] != None:
+                     file_list.append(os.path.basename(err_file[0].rstrip()))
+               if os.path.exists('_condor_stdout') == True:
+                  file_list.append('_condor_stdout')
+               else:
+                  out_file = grep('^Out\s+=\s+"(.*)"$', msg.data)
+                  if out_file != None and out_file[0] != None:
+                     file_list.append(os.path.basename(out_file[0].rstrip()))
+               for file in transfer_files[0].split(','):
+                  if file not in file_list:
+                     file_list.append(os.path.basename(file.rstrip()))
+            else:
+               file_list = os.listdir(".")
 
             # Archive all the important files
             results_filename = work_cwd + '/results.tar.gz'
@@ -818,6 +828,7 @@ def main(argv=None):
    private_key_file = '/root/.ec2/rsa_key'
    pidfile = ''
    daemon_mode = 0
+   share_data = None
 
    if argv is None:
       argv = sys.argv
@@ -900,21 +911,29 @@ def main(argv=None):
       # Create a container to share data between threads
       share_data = global_data()
 
-      try:
-         # Open a connection to the AWS SQS service
-         sqs_connection = SQSConnection(access_key, secret_key)
+      failed = 1
+      for attempt in range(1,5):
+         try:
+            # Open a connection to the AWS SQS service
+            sqs_connection = SQSConnection(access_key, secret_key)
 
-         # Create the work queue if it doesn't exist
-         work_queue = sqs_connection.create_queue('%s-%s' % (str(access_key), str(queue_name)))
+            # Create the work queue if it doesn't exist
+            work_queue = sqs_connection.create_queue('%s-%s' % (str(access_key), str(queue_name)))
 
-         # Create the status queue if it doesn't exist
-         status_queue = sqs_connection.create_queue('%s-%s-status' % (str(access_key), str(queue_name)))
+            # Create the status queue if it doesn't exist
+            status_queue = sqs_connection.create_queue('%s-%s-status' % (str(access_key), str(queue_name)))
 
-         # Open a connection to the AWS S3 service
-         s3_connection = S3Connection(access_key, secret_key)
-      except:
+            # Open a connection to the AWS S3 service
+            s3_connection = S3Connection(access_key, secret_key)
+            failed = 0
+            break
+         except:
+            time.sleep(5)
+            pass
+
+      if failed == 1:
          call(['shutdown',  '-h',  '-P',  'now'])
-
+   
       # Create a thread to monitor work expiration times
       monitor_thread = threading.Thread(target=lease_monitor, args=(share_data, sqs_config['lease_time'], sqs_config['lease_check_interval'], debug_logging))
       monitor_thread.setDaemon(True)
@@ -967,12 +986,25 @@ def main(argv=None):
    except exit_signal, exit_data:
       # Close the session before exiting
       shutdown_sockets(listen_socket, sock)
+
+      # Reset visibility timer on messages being processed
+      if share_data != None:
+         for item in share_data.values():
+            item.SQS_msg.change_visibility(1)
+            
       return(SUCCESS)
 
    except general_exception, error:
       log_messages(error)
+
       # Close the session before exiting
       shutdown_sockets(listen_socket, sock)
+
+      # Reset visibility timer on messages being processed
+      if share_data != None:
+         for item in share_data.values():
+            item.SQS_msg.change_visibility(1)
+
       return(FAILURE)
 
 if __name__ == '__main__':
