@@ -3,7 +3,7 @@
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
 Version: 1.0
-Release: 8%{?dist}
+Release: 9%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -66,6 +66,11 @@ touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
 %{python_sitelib}/ec2enhanced/__init__.py*
 
 %changelog
+* Thu Dec 18 2008  <rrati@redhat> - 1.0-9
+- Status hook no longer outputs updates if the job completed
+- Finalize hook prints ID of job that doesn't run
+- Cleanly remove tempory directory on failure cases
+
 * Mon Dec 15 2008  <rrati@redhat> - 1.0-8
 - The status hook outputs updates, not entire classads
 - The finalize hook does file remapping and places files in job's iwd

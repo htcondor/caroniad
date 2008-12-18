@@ -24,6 +24,20 @@ from boto.exception import *
 from jobhooks.functions import *
 from ec2enhanced.functions import *
 
+def remove_dir(dir):
+   if dir[-1] == os.sep:
+      dir = dir[:-1]
+   files = os.listdir(dir)
+   for file in files:
+      if file == '.' or file == '..':
+         continue
+      path = dir + os.sep + file
+      if os.path.isdir(path):
+         remove_dir(path)
+      else:
+         os.remove(path)
+   os.rmdir(dir)
+
 def main(argv=None):
    if argv == None:
       argv = sys.argv
@@ -37,8 +51,10 @@ def main(argv=None):
    stdout = ''
    stderr = ''
    remaps = ''
-   ec2_success = False
+   ec2_success = "false"
    ret_val = SUCCESS
+   cluster = 0
+   proc = 0
 
    # Read the source class ad from stdin and store it as well as the
    # job status.  The end of the source job is noted by '------'
@@ -64,6 +80,12 @@ def main(argv=None):
             continue
          if attribute.lower() == 'err' and value.lower() != '_condor_stderr':
             stderr = value
+            continue
+         if attribute.lower() == 'clusterid':
+            cluster = value
+            continue
+         if attribute.lower() == 'procid':
+            proc = value
             continue
 
    # Read the routed class ad from stdin and store the S3 information and
@@ -96,9 +118,9 @@ def main(argv=None):
    # If the source job is not in the completed state, but the routed job is
    # then there was a failure running the AMI.  Exit with status 2 so the
    # job will be re-routed.
-   if ec2_success == False:
-      syslog.syslog(syslog.LOG_INFO, 'The job did not complete.  Forcing the job to be routed again')
-      sys.stderr.write('The job did not complete.  Forcing the job to be routed again\n')
+   if ec2_success.lower() == "false":
+      syslog.syslog(syslog.LOG_INFO, 'Job %d.%d did not complete.  Forcing the job to be routed again' % (int(cluster), int(proc)))
+      sys.stderr.write('Job %d.%d did not complete.  Forcing the job to be routed again\n' % (int(cluster), int(proc)))
       return(FAILURE)
 
    # Pull the specific keys out of the files
@@ -113,17 +135,6 @@ def main(argv=None):
       key_file = open(aws_secret, 'r')
       aws_secret_val = key_file.readlines()[0].rstrip()
       key_file.close()
-
-   # Access S3 and extract the data into the staging area
-   results_filename = 'results.tar.gz'
-   temp_dir = tempfile.mkdtemp(suffix=str(os.getpid()))
-   try:
-      os.chdir(temp_dir)
-   except:
-      syslog.syslog(syslog.LOG_ERR, 'Unable to chdir to "%s"' % iwd)
-      sys.stderr.write('Unable to chdir to "%s"\n' % iwd)
-      os.removedirs(temp_dir)
-      return(FAILURE)
 
    # Connect to S3
    failed = 1
@@ -140,23 +151,37 @@ def main(argv=None):
          pass
 
    if failed == 1:
-      os.removedirs(temp_dir)
       return(FAILURE)
 
    if s3_bucket_obj == None:
       syslog.syslog(syslog.LOG_ERR, 'Error: Unable to access S3 to retrieve data from S3 bucket %s' % bucket)
       sys.stderr.write('Error: Unable to access S3 to retrieve data from S3 bucket %s\n' % bucket)
-      os.removedirs(temp_dir)
       return(FAILURE)
    else:
       s3_key_obj = s3_bucket_obj.get_key(key)
+
+   # Access S3 and extract the data into the staging area
+   results_filename = 'results.tar.gz'
+   try:
+      temp_dir = tempfile.mkdtemp(suffix=str(os.getpid()))
+      os.chdir(temp_dir)
+   except:
+      syslog.syslog(syslog.LOG_ERR, 'Unable to chdir to "%s"' % iwd)
+      sys.stderr.write('Unable to chdir to "%s"\n' % iwd)
+      if os.path.exists(temp_dir):
+         os.removedirs(temp_dir)
+      return(FAILURE)
 
    if s3_key_obj != None:
       s3_key_obj.get_contents_to_filename(results_filename)
    else:
       syslog.syslog(syslog.LOG_ERR, 'Error: Unable to find S3 key "%s" in S3 bucket "%s"' % (key, bucket))
       sys.stderr.write('Error: Unable to find S3 key "%s" in S3 bucket "%s"\n' % (key, bucket))
-      os.removedirs(temp_dir)
+      if os.path.exists(results_filename):
+         os.remove(results_filename)
+      os.chdir('/tmp')
+      if os.path.exists(temp_dir):
+         os.removedirs(temp_dir)
       return(FAILURE)
 
    try:
@@ -164,7 +189,10 @@ def main(argv=None):
    except:
       syslog.syslog(syslog.LOG_ERR, 'Error: Unable to extract results file')
       sys.stderr.write('Error: Unable to extract results file')
-      os.removedirs(temp_dir)
+      os.remove(results_filename)
+      os.chdir('/tmp')
+      if os.path.exists(temp_dir):
+         remove_dir(temp_dir)
       return(FAILURE)
 
    if os.path.exists(results_filename):
@@ -186,7 +214,8 @@ def main(argv=None):
       s3_bucket_obj.delete_key(s3_key_obj)
 
    # Remove the temporary directory
-   os.removedirs(temp_dir)
+   os.chdir('/tmp')
+   remove_dir(temp_dir)
 
    return(SUCCESS)
 

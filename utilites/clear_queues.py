@@ -1,5 +1,8 @@
 #!/usr/bin/python
 
+# To use this tool, the environment must have AWS_ACCESS_KEY_ID set to the
+# AWS access key and AWS_SECRET_ACCESS_KEY set to the secret access key.
+
 from boto.sqs.connection import SQSConnection
 from boto.sqs.message import Message
 from subprocess import *
