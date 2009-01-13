@@ -92,7 +92,14 @@ def main(argv=None):
    # For some reason get_queue don't always return the queue even if it
    # exists, so must iterate over the existing queues and find it that
    # way.  Annoying.
-   for q in sqs_con.get_all_queues(): 
+   try:
+      all_queues = sqs_con.get_all_queues()
+   except BotoServerError, error:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to retrieve SQS queues: %s, %s'% (sqs_queue_name, error.reason, error.body))
+      sys.stderr.write('Error: Unable to retrieve SQS queues: %s, %s\n'% (sqs_queue_name, error.reason, error.body))
+      return(FAILURE)
+
+   for q in all_queues: 
       if q.id.split('/')[2] == full_queue_name:
          work_queue = q
       if q.id.split('/')[2] == '%s-status' % full_queue_name:

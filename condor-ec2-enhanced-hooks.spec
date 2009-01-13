@@ -3,7 +3,7 @@
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
 Version: 1.0
-Release: 9%{?dist}
+Release: 10%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -66,6 +66,10 @@ touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
 %{python_sitelib}/ec2enhanced/__init__.py*
 
 %changelog
+* Tue Jan 13 2009  <rrati@redhat> - 1.0-10
+- Added handling of exceptions when retrieving queues from SQS
+- Finalize hook now updates the source job's stats
+
 * Thu Dec 18 2008  <rrati@redhat> - 1.0-9
 - Status hook no longer outputs updates if the job completed
 - Finalize hook prints ID of job that doesn't run

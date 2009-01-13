@@ -20,6 +20,7 @@ import tempfile
 import time
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
+from boto.sqs.connection import SQSConnection
 from boto.exception import *
 from jobhooks.functions import *
 from ec2enhanced.functions import *
@@ -55,6 +56,7 @@ def main(argv=None):
    ret_val = SUCCESS
    cluster = 0
    proc = 0
+   done_classad = ''
 
    # Read the source class ad from stdin and store it as well as the
    # job status.  The end of the source job is noted by '------'
@@ -113,6 +115,9 @@ def main(argv=None):
             continue
          if attribute.lower() == 'ec2jobsuccessful':
             ec2_success = value
+            continue
+         if attribute.lower() == 'amazonfullsqsqueuename':
+            queue_name = value
             continue
 
    # If the source job is not in the completed state, but the routed job is
@@ -188,7 +193,7 @@ def main(argv=None):
       tarball_extract(results_filename)
    except:
       syslog.syslog(syslog.LOG_ERR, 'Error: Unable to extract results file')
-      sys.stderr.write('Error: Unable to extract results file')
+      sys.stderr.write('Error: Unable to extract results file\n')
       os.remove(results_filename)
       os.chdir('/tmp')
       if os.path.exists(temp_dir):
@@ -211,11 +216,74 @@ def main(argv=None):
 
    # Remove the data from S3
    if s3_bucket_obj != '':
-      s3_bucket_obj.delete_key(s3_key_obj)
+      try:
+         s3_bucket_obj.delete_key(s3_key_obj)
+      except:
+         syslog.syslog(syslog.LOG_ERR, 'Warning: Unable to delete S3 key.  Key should be deleted during cleanup.')
+         sys.stderr.write('Warning: Unable to delete S3 key.  Key should be deleted during cleanup.\n')
 
    # Remove the temporary directory
-   os.chdir('/tmp')
-   remove_dir(temp_dir)
+   try:
+      os.chdir('/tmp')
+      remove_dir(temp_dir)
+   except:
+      syslog.syslog(syslog.LOG_ERR, 'Warning: Failed to remove temporary directory "%s"' % temp_dir)
+      sys.stderr.write('Warning: Failed to remove temporary directory "%s"\n' % temp_dir)
+
+   # Access SQS to get the final stats of the of the job
+   failed = 1
+   for attempt in range(1,5):
+      try:
+         sqs_con = SQSConnection(aws_key_val, aws_secret_val)
+         failed = 0
+         break
+      except BotoServerError, error:
+         syslog.syslog(syslog.LOG_ERR, 'Error: Unable to connect to SQS: %s, %s'% (error.reason, error.body))
+         sys.stderr.write('Error: Unable to connect to SQS: %s, %s\n' % (error.reason, error.body))
+         time.sleep(5)
+         pass
+
+   if failed == 1:
+      return(FAILURE)
+
+   # Retrieve the exit status message and print it as the update
+   sqs_queue_name = '%s-%s-status' % (str(aws_key_val), queue_name)
+   try:
+      sqs_queue = sqs_con.get_queue(sqs_queue_name)
+   except BotoServerError, error:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to retrieve SQS queue "%s": %s, %s'% (sqs_queue_name, error.reason, error.body))
+      sys.stderr.write('Error: Unable to retrieve SQS queue "%s": %s, %s\n'% (sqs_queue_name, error.reason, error.body))
+      return(FAILURE)
+      
+   # Find the completion message
+   if sqs_queue != None:
+      q_msg = sqs_queue.read(5)
+      while q_msg != None:
+         try:
+            msg = pickle.loads(q_msg.get_body())
+         except:
+            # Likely bad message in the queue so skip it by setting the
+            # visibility timer far enough in the future that we're unlikely
+            # to hit it again this pass but not so far that it won't be seen
+            # for a long time, and then move on to the next message
+            q_msg.change_visibility(15)
+            q_msg = sqs_queue.read(5)
+            continue
+
+         # Check the job status to see if this message notifies of
+         # job completion
+         job_status = grep('^JobStatus\s*=\s*(.)$', msg.classad)
+         if job_status != None and job_status[0] != None and \
+            int(job_status[0].rstrip()) == 4:
+            # We found the update that indicates the job completed.  This
+            # message is the update to the source job
+            done_classad = msg.classad
+            break
+         else:
+            q_msg = sqs_queue.read(5)
+
+   if done_classad != '':
+      print done_classad
 
    return(SUCCESS)
 

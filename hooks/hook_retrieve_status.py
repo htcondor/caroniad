@@ -81,7 +81,13 @@ def main(argv=None):
       return(FAILURE)
       
    sqs_queue_name = '%s-%s-status' % (str(aws_key_val), queue_name)
-   sqs_queue = sqs_con.get_queue(sqs_queue_name)
+   try:
+      sqs_queue = sqs_con.get_queue(sqs_queue_name)
+   except BotoServerError, error:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to retrieve SQS queue "%s": %s, %s'% (sqs_queue_name, error.reason, error.body))
+      sys.stderr.write('Error: Unable to retrieve SQS queue "%s": %s, %s\n'% (sqs_queue_name, error.reason, error.body))
+      return(FAILURE)
+
    if sqs_queue != None and job_completed.lower() != 'true':
       q_msg = sqs_queue.read(5)
       while q_msg != None:
