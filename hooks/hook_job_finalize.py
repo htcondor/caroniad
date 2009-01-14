@@ -18,6 +18,7 @@ import os
 import syslog
 import tempfile
 import time
+import pickle
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 from boto.sqs.connection import SQSConnection
@@ -272,12 +273,12 @@ def main(argv=None):
 
          # Check the job status to see if this message notifies of
          # job completion
-         job_status = grep('^JobStatus\s*=\s*(.)$', msg.classad)
+         job_status = grep('^JobStatus\s*=\s*(.)$', msg.class_ad)
          if job_status != None and job_status[0] != None and \
             int(job_status[0].rstrip()) == 4:
             # We found the update that indicates the job completed.  This
             # message is the update to the source job
-            done_classad = msg.classad
+            done_classad = msg.class_ad
             break
          else:
             q_msg = sqs_queue.read(5)

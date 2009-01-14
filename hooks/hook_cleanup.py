@@ -185,7 +185,7 @@ def main(argv=None):
    if results_queue != None:
       try:
          sqs_con.delete_queue(results_queue)
-      except:
+      except BotoServerError, error:
          syslog.syslog(syslog.LOG_ERR, 'Error: Unable to remove status SQS queue: %s, %s' % (error.reason, error.body))
          sys.stderr.write('Error: Unable to remove status SQS queue: %s, %s\n' % (error.reason, error.body))
          ret_val = FAILURE
