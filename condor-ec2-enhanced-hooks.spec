@@ -11,8 +11,8 @@ Source0: %{name}-%{version}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
 Requires: python >= 2.3
-Requires: condor >= 7.0.2-4
-Requires: condor-job-hooks-common
+Requires: condor >= 7.2.0-4
+Requires: condor-job-hooks-common >= 1.0-4
 Requires: condor-ec2-enhanced-hooks-common
 Requires: python-boto >= 1.0a
 Requires: openssl
