@@ -3,7 +3,7 @@
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
 Version: 1.0
-Release: 10%{?dist}
+Release: 11%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -66,6 +66,11 @@ touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
 %{python_sitelib}/ec2enhanced/__init__.py*
 
 %changelog
+* Tue Jan 20 2009  <rrati@redhat> - 1.0-11
+- Fixed problems in the translate hook when a job is rerouted
+- Cleaned up classad parsing
+- Increment counter denoting number of run attempts in EC2
+
 * Tue Jan 13 2009  <rrati@redhat> - 1.0-10
 - Added handling of exceptions when retrieving queues from SQS
 - Finalize hook now updates the source job's stats

@@ -1,7 +1,7 @@
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
 Version: 1.0
-Release: 7%{?dist}
+Release: 8%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -66,6 +66,12 @@ fi
 %_sbindir/caroniad
 
 %changelog
+* Thu Jan 22 2009  <rrati@redhat> - 1.0-8
+- Every time a job is run, a status message denoting a run attempt
+  is put in SQS (BZ480841)
+- When processing a job, any attributes added by caroniad will be
+  removed first to ensure no dupplicates
+
 * Mon Dec 15 2008  <rrati@redhat> - 1.0-7
 - Daemon no longer returns files created outside the job's iwd
 - Upon exit, reset visibility timeout for jobs that haven't finished

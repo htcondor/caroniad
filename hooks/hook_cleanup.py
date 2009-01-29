@@ -40,7 +40,7 @@ def main(argv=None):
 
    # Read the class ad from stdin and store the S3 information
    for line in sys.stdin:
-      match = grep('^(.*)\s*=\s*(.*)$', line.lstrip())
+      match = grep('^([^=]*)\s*=\s*(.*)$', line.lstrip())
       if match != None and match[0] != None and match[1] != None:
          attribute = match[0].rstrip()
          val_match = grep('^"(.*)"$', match[1].rstrip())

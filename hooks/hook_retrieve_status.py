@@ -36,9 +36,10 @@ def main(argv=None):
    job_completed = 'FALSE'
    update_skip_attribs = ['jobstatus', 'imagesize', 'enteredcurrentstatus',
                           'jobstartdate']
+   attempts = 0
 
    for line in sys.stdin:
-      match = grep('^(.*)\s*=\s*(.*)$', line.lstrip())
+      match = grep('^([^=]*)\s*=\s*(.*)$', line.lstrip())
       if match != None and match[0] != None and match[1] != None:
          attribute = match[0].rstrip().lstrip()
          val_match = grep('^"(.*)"$', match[1].rstrip())
@@ -58,6 +59,8 @@ def main(argv=None):
          if attribute.lower() == 'amazonfullsqsqueuename':
             queue_name = value
             continue
+         if attribute.lower() == 'ec2runattempts':
+            attempts = int(value)
 
    # Get the specified Amazon key information
    if os.path.exists(aws_key) == False or os.path.exists(aws_secret) == False:
@@ -115,6 +118,13 @@ def main(argv=None):
          if s3_key != None and key == None:
             status_classad += 'S3KeyID = "%s"\n' % s3_key
 
+         # If the message notifies of a run attempt, increment the counter
+         # on the number of runs attempts
+         run_try = grep ('^EC2JobAttempted\s*=\s*(.*)$', status_classad)
+         if run_try != None and run_try[0] != None and \
+            run_try[0].rstrip().lower() == 'true':
+            update_classad += 'EC2RunAttempts = %d\n' % (attempts+1)
+
          # Check the job status to see if this message notifies of
          # job completion
          job_status = grep('^JobStatus\s*=\s*(.)$', status_classad)
@@ -122,19 +132,11 @@ def main(argv=None):
             int(job_status[0].rstrip()) == 4:
             # We found an update that indicates the job completed.
             # Add a marker to the classad saying the job has completed.
-            update_classad = 'EC2JobSuccessful = True\n'
+            update_classad += 'EC2JobSuccessful = True\n'
          else:
             # Remove the message from the queue only if it's not the success
             # message
             sqs_queue.delete_message(q_msg)
-
-         # Remove unwanted attributes from the update
-#         for line in status_classad.split('\n'):
-#            match = grep('^(.*)\s*=.*$', line.lstrip())
-#            if match != None and match[0] != None and \
-#               match[0].rstrip().lower() in update_skip_attribs:
-#               continue
-#            update_classad += '%s\n' % line
 
          # Print the update information
          if update_classad != '':

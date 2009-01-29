@@ -41,7 +41,9 @@ def main(argv=None):
    skip_attribs = ['clusterid', 'procid', 'bufferblocksize', 'buffersize',
                    'condorplatform', 'condorversion', 'coresize',
                    'globaljobid', 'qdate', 'remotewallclocktime', 'servertime',
-                   'autoclusterid', 'autoclusterattrs', 'currenthosts']
+                   'autoclusterid', 'autoclusterattrs', 'currenthosts', 
+                   'routedtojobid', 'managed', 'managedmanager', 'periodichold',
+                   'periodicremove', 'periodicrelease']
    int_reset_attribs = ['exitstatus', 'completiondate', 'localsyscpu',
                         'localusercpu', 'numckpts', 'numrestarts',
                         'numsystemholds', 'committedtime', 'totalsuspensions',
@@ -62,7 +64,7 @@ def main(argv=None):
    # Parse the route information from stdin.
    route = grep('^\[\s*(.*)\s*\]$', sys.stdin.readline())[0]
    for line in route.split(';'):
-      match = grep('^(.*)\s*=\s*(.*)$', line.lstrip())
+      match = grep('^([^=]*)\s*=\s*(.*)$', line.lstrip())
       if match != None and match[0] != None and match[1] != None:
          attribute = match[0].rstrip()
          val_match = grep('^"(.*)"$', match[1].rstrip())
@@ -100,36 +102,40 @@ def main(argv=None):
    for line in sys.stdin:
       if line.rstrip() == delim:
          continue
-      match = re.match('^(.*)\s*=\s*(.*)$', line)
-      if match != None and match.groups() != None:
-         attribute = match.groups()[0].rstrip()
-         value = match.groups()[1].rstrip()
+      match = grep('^([^=]*)\s*=\s*(.*)$', line)
+      if match != None and match[0] != None and match[1] != None:
+         attribute = match[0].rstrip()
+         val_match = grep('^"(.*)"$', match[1].rstrip())
+         if val_match != None and val_match[0] != None:
+            value = val_match[0].rstrip().lstrip()
+         else:
+            value = match[1].rstrip().lstrip()
          if attribute.lower() == 'iwd':
             # Remove the IWD from the class ad so the execute directory
             # will be used
-            iwd = value.rstrip()
+            iwd = value
          if attribute.lower() == 'amazonpublickey':
             if aws_public_key == '':
-               user_aws_public_key = grep('^"(.*)"$', value)[0]
+               user_aws_public_key = value
             continue
          if attribute.lower() == 'amazonprivatekey':
             if aws_private_key == '':
-               user_aws_private_key = grep('^"(.*)"$', value)[0]
+               user_aws_private_key = value
             continue
          if attribute.lower() == 'amazonaccesskey':
             if aws_key == '':
-               user_aws_key = grep('^"(.*)"$', value)[0]
+               user_aws_key = value
             continue
          if attribute.lower() == 'amazonsecretkey':
             if aws_secret == '':
-               user_aws_secret = grep('^"(.*)"$', value)[0]
+               user_aws_secret = value
             continue
          if attribute.lower() == 'rsapublickey':
             if rsa_public_key == '':
-               user_rsa_public_key = grep('^"(.*)"$', value)[0]
+               user_rsa_public_key = value
             continue
          if attribute.lower() == 'globaljobid':
-            global_id = grep('^"(.*)"$', value)[0].replace('#', '').replace('@', '').replace('.', '')
+            global_id = value.replace('#', '').replace('@', '').replace('.', '')
          if attribute.lower() in skip_attribs:
             continue
          sqs_data.class_ad += str(line)
@@ -151,7 +157,7 @@ def main(argv=None):
             grid_classad += attribute + ' = FALSE\n'
             continue
          if attribute.lower() == 'shouldtransferfiles':
-            create_sandbox = re.match('^"(.+)"$', value.lower()).groups()[0]
+            create_sandbox = value.lower()
             grid_classad += attribute + ' = "NO"\n'
             continue
          if attribute.lower() == 'transferexecutable':
@@ -171,20 +177,20 @@ def main(argv=None):
    new_ad = ''
    files = []
    for line in sqs_data.class_ad.split('\n'):
-      match = re.match('^(.*)\s*=\s*(.*)$', line)
-      if match != None and match.groups() != None:
-         attribute = match.groups()[0].rstrip()
-         value = match.groups()[1].rstrip()
+      match = grep('^([^=]*)\s*=\s*(.*)$', line)
+      if match != None and match[0] != None and match[1] != None:
+         attribute = match[0].rstrip()
+         value = match[1].rstrip()
 
          # Ignore files in /dev (like /dev/null)
-         if re.match('^"/dev/.*"', value) != None:
+         if grep('^"/dev/.*"', value) != None:
             continue
 
          # Remove quotes if they exist.  This is a string, so try to split on
          # the '/' character.  If a / exists, it's a file with a full path
-         match = re.match('^"(.*)"$', value)
-         if match != None and match.groups() != None:
-            split_val = os.path.split(match.groups()[0])
+         match = grep('^"(.*)"$', value)
+         if match != None and match[0] != None:
+            split_val = os.path.split(match[0])
 
          # Replace these attributes in the job class ad or the AMI instance
          # will fail.  Need to remove any reference to directories so all
@@ -198,9 +204,11 @@ def main(argv=None):
                new_ad += line + '\n'
                continue
             if split_val[0] == '':
-               files.append(iwd + '/' + match.groups()[0].rstrip() + '\n')
+               files.append(iwd + '/' + match[0].rstrip() + '\n')
+            elif os.path.exists(split_val[0]) == False:
+               files.append(iwd + '/' + split_val[1] + '\n')
             else:
-               files.append(match.groups()[0].rstrip() + '\n')
+               files.append(match[0].rstrip() + '\n')
             new_ad += attribute + ' = "' + split_val[1].rstrip() + '"\n'
             continue
          new_ad += line + '\n'
@@ -298,11 +306,17 @@ def main(argv=None):
       tarfile_name = '/tmp/archive-' + str(os.getpid()) + '.tar.gz'
       data_files = tarfile.open(tarfile_name, 'w:gz')
       for file in files:
-         tar_obj = data_files.gettarinfo(file.rstrip())
-         file_obj = open(file.rstrip())
-         tar_obj.name = os.path.basename(tar_obj.name)
-         data_files.addfile(tar_obj, file_obj)
-         file_obj.close()
+         if os.path.exists(file.rstrip()) == True:
+            tar_obj = data_files.gettarinfo(file.rstrip())
+            file_obj = open(file.rstrip())
+            tar_obj.name = os.path.basename(tar_obj.name)
+            data_files.addfile(tar_obj, file_obj)
+            file_obj.close()
+         else:
+            syslog.syslog(syslog.LOG_ERR, 'Error: Unable to find file "%s"' % file)
+            sys.stderr.write('Error: Unable to find file "%s"\n' % file)
+            os.remove(tarfile_name)
+            return(FAILURE)
       data_files.close()
       s3_key = Key(s3_bucket)
       if s3_key == None:

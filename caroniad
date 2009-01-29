@@ -270,7 +270,8 @@ def handle_get_work(req_socket, reply, queue, known_items, log):
    if log == True:
       print '%s called at %s' % (func_name, str(time.localtime()))
 
-   remove_attribs = ['iwd', 'userlog']
+   remove_attribs = ['ec2origowner', 'iwd', 'userlog', 'sqsmessageid',
+                     'wf_req_slot', 'isfeatched']
    file_attribs = ['err', 'out', 'transferoutput']
 
    try:
@@ -335,7 +336,7 @@ def handle_get_work(req_socket, reply, queue, known_items, log):
       # created in the execute directory
       ad = ''
       for line in reply.data.split('\n'):
-         match = grep('^(.*)\s*=\s*(.*)$', line)
+         match = grep('^([^=]*)\s*=\s*(.*)$', line)
          if match != None and match[0] != None:
             if match[0].rstrip().lower() in remove_attribs:
                continue
@@ -438,7 +439,7 @@ def handle_reply_fetch(msg, queue, known_items, log):
             result_ad = ''
             orig_owner = ''
             for line in msg.data.split('\n'):
-               match = grep('^(.*)\s*=\s*(.+)$', line)
+               match = grep('^([^=]*)\s*=\s*(.+)$', line)
                if re.match('---', line) != None:
                   break
                elif match != None and match[0] != None:
@@ -455,6 +456,7 @@ def handle_reply_fetch(msg, queue, known_items, log):
                if line != '':
                   result_ad += line + "\n"
             result_ad += 'Owner = %s\n' % orig_owner
+            result_ad += 'EC2JobAttempted = True\n'
 
             response = pickle.loads(saved_work.SQS_msg.get_body())
             response.class_ad = result_ad
@@ -580,7 +582,7 @@ def handle_update_job_status(msg, queue, known_items, log):
             # appropriate state, so change it to say the job is running(2).
             result_ad = ''
             for line in msg.data.split('\n'):
-               match = grep('^(.*)\s*=\s*(.+)$', line)
+               match = grep('^([^=]*)\s*=\s*(.+)$', line)
                if match != None and match[0] != None:
                   if match[0].rstrip().lower() in remove_attribs:
                      continue
@@ -624,12 +626,12 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
       print '%s called at %s' % (func_name, str(time.localtime()))
 
    file_list = []
-   remove_attribs = ['iwd', 'owner']
+   remove_attribs = ['iwd', 'owner', 'jobfinishedhookdone', ]
    normal_exit = 0
 
    try:
       # Determine the slot that is reporting results
-      slots = grep ('^WF_REQ_SLOT\s*=\s*"(.+)"$', msg.data)
+      slots = grep('^WF_REQ_SLOT\s*=\s*"(.+)"$', msg.data)
       if slots == None:
          syslog.syslog(syslog.LOG_WARNING, 'Unable to determine SlotID for results.')
       else:
@@ -734,7 +736,7 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
                run_time = 0
                orig_owner = ''
                for line in msg.data.split('\n'):
-                  match = grep('^(.*)\s*=\s*(.+)$', line)
+                  match = grep('^([^=]*)\s*=\s*(.+)$', line)
                   if match != None and match[0] != None:
                      if match[0].rstrip().lower() == 'jobstatus':
                         result_ad += 'JobStatus = 4\n'
@@ -744,8 +746,6 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
                      elif match[0].rstrip() == 'EC2OrigOwner' and \
                           match[1] != None:
                         orig_owner = match[1].rstrip()
-                        continue
-                     elif match[0].rstrip().lower() == 'owner':
                         continue
                   if line != '':
                      result_ad += line + "\n"

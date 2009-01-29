@@ -64,7 +64,7 @@ def main(argv=None):
    for line in sys.stdin:
       if line.rstrip() == '------':
          break
-      match = grep('^(.*)\s+=\s+(.*)$', line.lstrip())
+      match = grep('^([^=]*)\s+=\s+(.*)$', line.lstrip())
       if match != None and match[0] != None and match[1] != None:
          attribute = match[0].rstrip()
          val_match = grep('^"(.*)"$', match[1].rstrip())
@@ -94,7 +94,7 @@ def main(argv=None):
    # Read the routed class ad from stdin and store the S3 information and
    # the job status
    for line in sys.stdin:
-      match = grep('^(.*)\s*=\s*(.*)$', line.lstrip())
+      match = grep('^([^=]*)\s*=\s*(.*)$', line.lstrip())
       if match != None and match[0] != None and match[1] != None:
          attribute = match[0].rstrip()
          val_match = grep('^"(.*)"$', match[1].rstrip())
