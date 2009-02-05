@@ -22,7 +22,8 @@ s3_con = S3Connection()
 buckets = s3_con.get_all_buckets()
 for bucket in buckets:
    print "Examining bucket: " + bucket.name
-   if bucket.name == "xerox_beta" or bucket.name == 'ec2etesting':
+   if bucket.name == 'ec2etesting':
+      print "Skipping bucket: " + bucket.name
       continue
    s3_bucket = s3_con.get_bucket(bucket.name)
    for s3_key in s3_bucket.list():

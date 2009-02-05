@@ -84,9 +84,9 @@ def main(argv=None):
    full_queue_name = '%s-%s' % (str(aws_key_val), queue_name)
    try:
       sqs_con = SQSConnection(aws_key_val, aws_secret_val)
-   except:
-      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to connect to SQS')
-      sys.stderr.write('Error: Unable to connect to SQS\n')
+   except BotoServerError, error:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to connect to SQS: %s, %s' % (error.reason, error.body))
+      sys.stderr.write('Error: Unable to connect to SQS: %s, %s\n' % (error.reason, error.body))
       return(FAILURE)
 
    # For some reason get_queue don't always return the queue even if it
@@ -108,7 +108,12 @@ def main(argv=None):
    for queue in (work_queue, results_queue):
       if queue != None:
          # Remove all messages in the queue
-         q_msg = queue.read()
+         try:
+            q_msg = queue.read()
+         except SQSError, error:
+            syslog.syslog(syslog.LOG_ERR, 'Error reading messages from SQS queue "%s": %s, %s' % (q.id, error.reason, error.body))
+            sys.stderr.write('Error reading messages from SQS queue "%s": %s, %s\n' % (q.id, error.reason, error.body))
+            return(FAILURE)
          while q_msg != None:
             try:
                msg = pickle.loads(q_msg.get_body())
@@ -116,7 +121,12 @@ def main(argv=None):
                # Likely bad message in the queue so remove it and continue
                # removing messages
                queue.delete_message(q_msg)
-               q_msg = queue.read()
+               try:
+                  q_msg = queue.read()
+               except SQSError, error:
+                  syslog.syslog(syslog.LOG_ERR, 'Error reading messages from SQS queue "%s": %s, %s' % (q.id, error.reason, error.body))
+                  sys.stderr.write('Error reading messages from SQS queue "%s": %s, %s\n' % (q.id, error.reason, error.body))
+                  return(FAILURE)
                continue
    
             # Grab the S3 bucket if it wasn't in the input classad
@@ -126,21 +136,18 @@ def main(argv=None):
                except:
                   # Message had no s3_bucket for some reason.
                   sys.stderr.write('Error: Message has no S3 bucket\n')
-                  ret_val = FAILURE
+                  return(FAILURE)
    
             # Grab the S3 key if it wasn't defined already
             if key == '':
-               if q_msg.s3_key == '':
-                  if msg.s3_key == None:
-                     s3_key = grep('^S3KeyID\s*=\s*"(.+)"$', msg.class_ad)
-                     if s3_key == None or s3_key[0] == None:
-                        s3_key = grep('^s3keyid\s*=\s*"(.+)"$', msg.class_ad)
-                     if s3_key != None and s3_key[0] != None:
-                        key = s3_key[0]
-                  else:
-                     key = msg.s3_key
+               if msg.s3_key == None:
+                  s3_key = grep('^S3KeyID\s*=\s*"(.+)"$', msg.class_ad)
+                  if s3_key == None or s3_key[0] == None:
+                     s3_key = grep('^s3keyid\s*=\s*"(.+)"$', msg.class_ad)
+                  if s3_key != None and s3_key[0] != None:
+                     key = s3_key[0]
                else:
-                  key = q_msg.s3_key
+                  key = msg.s3_key
    
             # Delete the message.  There may be more so keep processing
             queue.delete_message(q_msg)
@@ -152,16 +159,17 @@ def main(argv=None):
       s3_con = S3Connection(aws_key_val, aws_secret_val)
       s3_bucket_obj = s3_con.get_bucket(bucket)
    except BotoServerError, error:
-      syslog.syslog(syslog.LOG_ERR, 'Error accessing S3 bucket "%s": %s, %s' % (bucket, error.reason, error.body))
-      sys.stderr.write('Error accessing S3 bucket "%s": %s, %s\n' % (bucket, error.reason, error.body))
-      ret_val = FAILURE
+      if grep('Not Found', error.reason) == None:
+         syslog.syslog(syslog.LOG_ERR, 'Error accessing S3 bucket "%s": %s, %s' % (bucket, error.reason, error.body))
+         sys.stderr.write('Error accessing S3 bucket "%s": %s, %s\n' % (bucket, error.reason, error.body))
+         return(FAILURE)
 
    # Remove the data from S3, if there is any
    if key != '' and ret_val == SUCCESS:
       if s3_bucket_obj == None:
          syslog.syslog(syslog.LOG_ERR, 'Error: Unable to access S3 to clean up data in S3 bucket %s' % bucket)
          sys.stderr.write('Error: Unable to access S3 to clean up data in S3 bucket %s\n' % bucket)
-         ret_val = FAILURE
+         return(FAILURE)
       else:
          try:
             s3_key_obj = s3_bucket_obj.get_key(key)
@@ -170,7 +178,7 @@ def main(argv=None):
          except S3ResponseError, error:
             syslog.syslog(syslog.LOG_ERR, 'Error: Unable to delete S3 key "%s": %s, %s' % (key, error.reason, error.body))
             sys.stderr.write('Error: Unable to delete S3 key "%s": %s, %s\n' % (key, error.reason, error.body))
-            ret_val = FAILURE
+            return(FAILURE)
 
    # Remove the SQS queues.  If unable to do so, messages still exist in the
    # queues so cleanup will need to happen again

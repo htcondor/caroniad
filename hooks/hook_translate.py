@@ -25,6 +25,7 @@ from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 from boto.sqs.connection import SQSConnection
 from boto.sqs.message import Message
+from boto.exception import *
 from jobhooks.functions import *
 from ec2enhanced.functions import *
 
@@ -40,7 +41,7 @@ def main(argv=None):
    transfer_exe = 'true'
    skip_attribs = ['clusterid', 'procid', 'bufferblocksize', 'buffersize',
                    'condorplatform', 'condorversion', 'coresize',
-                   'globaljobid', 'qdate', 'remotewallclocktime', 'servertime',
+                   'qdate', 'remotewallclocktime', 'servertime',
                    'autoclusterid', 'autoclusterattrs', 'currenthosts', 
                    'routedtojobid', 'managed', 'managedmanager', 'periodichold',
                    'periodicremove', 'periodicrelease']
@@ -60,6 +61,8 @@ def main(argv=None):
    rsa_public_key = ''
    global_id = ''
    delay = ''
+   s3_key = ''
+   route_name = ''
 
    # Parse the route information from stdin.
    route = grep('^\[\s*(.*)\s*\]$', sys.stdin.readline())[0]
@@ -72,6 +75,9 @@ def main(argv=None):
             value = val_match[0].rstrip().lstrip()
          else:
             value = match[1].rstrip().lstrip()
+         if attribute.lower() == 'name':
+            route_name = value
+            continue
          if attribute.lower() == 'set_amazonpublickey':
             aws_public_key = value
             continue
@@ -140,6 +146,8 @@ def main(argv=None):
             continue
          sqs_data.class_ad += str(line)
 
+         if attribute.lower() == 'globaljobid':
+            continue
          if attribute.lower() == 'jobuniverse':
             grid_classad += 'JobUniverse = 9\n'
             grid_classad += 'Remote_JobUniverse = ' + str(value) + '\n'
@@ -164,6 +172,8 @@ def main(argv=None):
             transfer_exe = value.lower()
          if attribute.lower() == 'cmd' or attribute.lower() == 'command':
             executable = value
+            grid_classad += 'Cmd = "EC2: %s: %s"\n' % (route_name, value)
+            continue
       grid_classad += str(line)
 
    job_queue = '%s-%s' % (queue_name, global_id)
@@ -285,17 +295,17 @@ def main(argv=None):
    # data
    try:
       s3_con = S3Connection(aws_key_val, aws_secret_val)
-   except:
-      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to connect to S3')
-      sys.stderr.write('Error: Unable to connect to S3\n')
+   except BotoServerError, error:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to connect to S3: %s, %s' % (error.reason, error.body))
+      sys.stderr.write('Error: Unable to connect to S3: %s, %s\n' % (error.reason, error.body))
       return(FAILURE)
       
    s3_bucket_name = '%s-%s' % (str(aws_key_val), bucket_id)
    try:
       s3_bucket = s3_con.create_bucket(s3_bucket_name)
-   except:
-      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to create S3 bucket "%s"' % s3_bucket_name)
-      sys.stderr.write('Error: Unable to create S3 bucket "%s"\n' % s3_bucket_name)
+   except BotoServerError, error:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to create S3 bucket "%s": %s, %s' % (s3_bucket_name, error.reason, error.body))
+      sys.stderr.write('Error: Unable to create S3 bucket "%s": %s, %s\n' % (s3_bucket_name, error.reason, error.body))
       return(FAILURE)
    sqs_data.s3_bucket = s3_bucket_name
    grid_classad += 'S3BucketID = "%s"\n' % s3_bucket_name
@@ -329,9 +339,9 @@ def main(argv=None):
          sqs_data.s3_key = s3_key.key
          try:
             s3_key.set_contents_from_filename(tarfile_name)
-         except:
-            syslog.syslog(syslog.LOG_ERR, 'Error: Unable place job data files into S3 bucket %s, key %s' % (s3_bucket_name, s3_key.key))
-            sys.stderr.write('Error: Unable place job data files into S3 bucket %s, key %s\n' % (s3_bucket_name, s3_key.key))
+         except BotoServerError, error:
+            syslog.syslog(syslog.LOG_ERR, 'Error: Unable place job data files into S3 bucket %s, key %s: %s, %s' % (s3_bucket_name, s3_key.key, error.reason, error.body))
+            sys.stderr.write('Error: Unable place job data files into S3 bucket %s, key %s: %s, %s\n' % (s3_bucket_name, s3_key.key, error.reason, error.body))
             os.remove(tarfile_name)
             return(FAILURE)
          
@@ -342,27 +352,29 @@ def main(argv=None):
    message = Message(body=pickle.dumps(sqs_data))
    try:
       sqs_con = SQSConnection(aws_key_val, aws_secret_val)
-   except:
-      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to connect to SQS')
-      sys.stderr.write('Error: Unable to connect to SQS\n')
-      try:
-         s3_bucket.delete_key(s3_key)
-      except:
-         syslog.syslog(syslog.LOG_ERR, 'Error: Unable to remove job data from S3')
-         sys.stderr.write('Error: Unable to remove job data from S3\n')
+   except BotoServerError, error:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to connect to SQS: %s, %s' % (error.reason, error.body))
+      sys.stderr.write('Error: Unable to connect to SQS: %s, %s\n' % (error.reason, error.body))
+      if s3_key != '':
+         try:
+            s3_bucket.delete_key(s3_key)
+         except BotoServerError, error:
+            syslog.syslog(syslog.LOG_ERR, 'Error: Unable to remove job data from S3: %s, %s' % (error.reason, error.body))
+            sys.stderr.write('Error: Unable to remove job data from S3: %s, %s\n')
       return(FAILURE)
 
    try:
       sqs_queue = sqs_con.create_queue(sqs_queue_name)
       sqs_queue.write(message)
-   except:
-      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to write job to SQS queue "%s"' % sqs_queue_name)
-      sys.stderr.write('Error: Unable to write job to SQS queue "%s"\n' % sqs_queue_name)
-      try:
-         s3_bucket.delete_key(s3_key)
-      except:
-         syslog.syslog(syslog.LOG_ERR, 'Error: Unable to remove job data from S3')
-         sys.stderr.write('Error: Unable to remove job data from S3\n')
+   except BotoServerError, error:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to write job to SQS queue "%s": %s, %s' % (sqs_queue_name, error.reason, error.body))
+      sys.stderr.write('Error: Unable to write job to SQS queue "%s": %s, %s\n' % (sqs_queue_name, error.reason, error.body))
+      if s3_key != '':
+         try:
+            s3_bucket.delete_key(s3_key)
+         except BotoServerError, error:
+            syslog.syslog(syslog.LOG_ERR, 'Error: Unable to remove job data from S3: %s, %s' % (error.reason, error.body))
+            sys.stderr.write('Error: Unable to remove job data from S3: %s, %s\n' % (error.reason, error.body))
       return(FAILURE)
    grid_classad += 'SQSMessageId = "' + str(message.id) + '"\n'
 

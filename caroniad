@@ -628,6 +628,7 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
    file_list = []
    remove_attribs = ['iwd', 'owner', 'jobfinishedhookdone', ]
    normal_exit = 0
+   global_id = ''
 
    try:
       # Determine the slot that is reporting results
@@ -672,13 +673,14 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
             if results.s3_key != None:
                s3_key = s3_bucket.get_key(results.s3_key)
             else:
-               match = grep('^GlobalJobId\s*=\s*"(.+)"$', msg.data)
+               match = grep('^GlobalJobId\s*=\s*"(.*)"$', msg.data)
                if match != None and match[0] != None:
-                  global_id = match[0]
+                  global_id = match[0].replace('#', '').replace('@', '').replace('.', '')
                aws_access_key = s3_storage.aws_access_key_id
                s3_key = Key(s3_bucket)
                s3_key.key = str(aws_access_key) + '-' + str(global_id)
                results.s3_key = s3_key.key
+               msg.data += 'S3KeyID = "%s"\n' % s3_key.key
 
             # Create the list of files to put into the results archive
             orig_cwd = os.getcwd()

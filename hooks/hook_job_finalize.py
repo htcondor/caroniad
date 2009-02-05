@@ -19,6 +19,7 @@ import syslog
 import tempfile
 import time
 import pickle
+import shutil
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 from boto.sqs.connection import SQSConnection
@@ -58,6 +59,7 @@ def main(argv=None):
    cluster = 0
    proc = 0
    done_classad = ''
+   s3_key = ''
 
    # Read the source class ad from stdin and store it as well as the
    # job status.  The end of the source job is noted by '------'
@@ -106,7 +108,7 @@ def main(argv=None):
             bucket = value
             continue
          if attribute.lower() == 's3keyid':
-            key = value
+            s3_key = value
             continue
          if attribute.lower() == 'amazonaccesskey':
             aws_key = value
@@ -164,7 +166,7 @@ def main(argv=None):
       sys.stderr.write('Error: Unable to access S3 to retrieve data from S3 bucket %s\n' % bucket)
       return(FAILURE)
    else:
-      s3_key_obj = s3_bucket_obj.get_key(key)
+      s3_key_obj = s3_bucket_obj.get_key(s3_key)
 
    # Access S3 and extract the data into the staging area
    results_filename = 'results.tar.gz'
@@ -181,8 +183,8 @@ def main(argv=None):
    if s3_key_obj != None:
       s3_key_obj.get_contents_to_filename(results_filename)
    else:
-      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to find S3 key "%s" in S3 bucket "%s"' % (key, bucket))
-      sys.stderr.write('Error: Unable to find S3 key "%s" in S3 bucket "%s"\n' % (key, bucket))
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to find S3 key "%s" in S3 bucket "%s"' % (s3_key, bucket))
+      sys.stderr.write('Error: Unable to find S3 key "%s" in S3 bucket "%s"\n' % (s3_key, bucket))
       if os.path.exists(results_filename):
          os.remove(results_filename)
       os.chdir('/tmp')
@@ -213,15 +215,15 @@ def main(argv=None):
             os.rename(remap_info[0], remap_info[1])
 
    for file in os.listdir('.'):
-      os.rename(file, '%s/%s' % (iwd, file))
+      shutil.move(file, iwd)
 
    # Remove the data from S3
    if s3_bucket_obj != '':
       try:
          s3_bucket_obj.delete_key(s3_key_obj)
-      except:
-         syslog.syslog(syslog.LOG_ERR, 'Warning: Unable to delete S3 key.  Key should be deleted during cleanup.')
-         sys.stderr.write('Warning: Unable to delete S3 key.  Key should be deleted during cleanup.\n')
+      except BotoServerError, error:
+         syslog.syslog(syslog.LOG_ERR, 'Warning: Unable to delete S3 key.  Key should be deleted during cleanup: %s, %s' % (error.reason, error.body))
+         sys.stderr.write('Warning: Unable to delete S3 key.  Key should be deleted during cleanup %s, %s\n' % (error.reason, error.body))
 
    # Remove the temporary directory
    try:
@@ -252,8 +254,8 @@ def main(argv=None):
    try:
       sqs_queue = sqs_con.get_queue(sqs_queue_name)
    except BotoServerError, error:
-      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to retrieve SQS queue "%s": %s, %s'% (sqs_queue_name, error.reason, error.body))
-      sys.stderr.write('Error: Unable to retrieve SQS queue "%s": %s, %s\n'% (sqs_queue_name, error.reason, error.body))
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to retrieve SQS queue "%s": %s, %s' % (sqs_queue_name, error.reason, error.body))
+      sys.stderr.write('Error: Unable to retrieve SQS queue "%s": %s, %s\n' % (sqs_queue_name, error.reason, error.body))
       return(FAILURE)
       
    # Find the completion message

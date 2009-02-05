@@ -33,6 +33,7 @@ def main(argv=None):
    aws_secret = ''
    queue_name = ''
    update_classad = ''
+   ad_s3key = ''
    job_completed = 'FALSE'
    update_skip_attribs = ['jobstatus', 'imagesize', 'enteredcurrentstatus',
                           'jobstartdate']
@@ -61,6 +62,11 @@ def main(argv=None):
             continue
          if attribute.lower() == 'ec2runattempts':
             attempts = int(value)
+            continue
+         if attribute.lower() == 's3keyid':
+            ad_s3key = value
+            continue
+
 
    # Get the specified Amazon key information
    if os.path.exists(aws_key) == False or os.path.exists(aws_secret) == False:
@@ -78,9 +84,9 @@ def main(argv=None):
    # Look for an update
    try:
       sqs_con = SQSConnection(aws_key_val, aws_secret_val)
-   except:
-      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to connect to SQS')
-      sys.stderr.write('Error: Unable to connect to SQS\n')
+   except BotoServerError, error:
+      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to connect to SQS: %s, %s' % (error.reason, error.body))
+      sys.stderr.write('Error: Unable to connect to SQS: %s, %s\n' % (error.reason, error.body))
       return(FAILURE)
       
    sqs_queue_name = '%s-%s-status' % (str(aws_key_val), queue_name)
@@ -114,13 +120,17 @@ def main(argv=None):
          # Add the S3 Key ID if it isn't there already.  This happens
          # in the case where nothing was needed to be transfered to
          # the execute node
-         key = grep('^S3KeyID\s*=.*$', status_classad)
-         if s3_key != None and key == None:
-            status_classad += 'S3KeyID = "%s"\n' % s3_key
+         if s3_key != None and ad_s3key == '':
+            update_classad += 'S3KeyID = "%s"\n' % s3_key
+         else:
+            key = grep('^S3KeyID\s*=\s*"(.*)"$', status_classad)
+            if s3_key == None and ad_s3key == '' and \
+               key != None and key[0] != None:
+               update_classad += 'S3KeyID = "%s"\n' % key[0]
 
          # If the message notifies of a run attempt, increment the counter
          # on the number of runs attempts
-         run_try = grep ('^EC2JobAttempted\s*=\s*(.*)$', status_classad)
+         run_try = grep('^EC2JobAttempted\s*=\s*(.*)$', status_classad)
          if run_try != None and run_try[0] != None and \
             run_try[0].rstrip().lower() == 'true':
             update_classad += 'EC2RunAttempts = %d\n' % (attempts+1)

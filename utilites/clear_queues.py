@@ -6,6 +6,7 @@
 from boto.sqs.connection import SQSConnection
 from boto.sqs.message import Message
 from subprocess import *
+from boto.exception import *
 import time
 import pickle
 
@@ -26,5 +27,6 @@ for queue in queues:
       m = queue.read(10)
    try:
       conn.delete_queue(queue)
-   except:
+   except BotoServerError, error:
+      print 'Unable to delete SQS queue %s: %s, %s' % (queue.id, error.reason, error.body)
       pass

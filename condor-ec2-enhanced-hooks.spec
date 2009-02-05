@@ -66,10 +66,12 @@ touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
 %{python_sitelib}/ec2enhanced/__init__.py*
 
 %changelog
-* Tue Jan 20 2009  <rrati@redhat> - 1.0-11
+* Tue Feb  5 2009  <rrati@redhat> - 1.0-11
 - Fixed problems in the translate hook when a job is rerouted
 - Cleaned up classad parsing
 - Increment counter denoting number of run attempts in EC2
+- Fixed logic error if the S3 key wasn't created by the translate hook
+- Changed Cmd attribute for routed job to be: "EC2: <route name>: <original cmd>"
 
 * Tue Jan 13 2009  <rrati@redhat> - 1.0-10
 - Added handling of exceptions when retrieving queues from SQS

@@ -70,7 +70,8 @@ fi
 - Every time a job is run, a status message denoting a run attempt
   is put in SQS (BZ480841)
 - When processing a job, any attributes added by caroniad will be
-  removed first to ensure no dupplicates
+  removed first to ensure no duplicates
+- Fixed issue transfering results to S3 if the job had no data sent
 
 * Mon Dec 15 2008  <rrati@redhat> - 1.0-7
 - Daemon no longer returns files created outside the job's iwd

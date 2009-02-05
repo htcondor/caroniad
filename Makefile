@@ -1,6 +1,6 @@
 .PHONY: build condor-ec2-enhanced condor-ec2-enhanced-hooks
 
-RPMBUILD_DIRS := BUILD RPMS SOURCES SPECS SRPMS
+RPMBUILD_DIRS := BUILD BIULDROOT RPMS SOURCES SPECS SRPMS BUILDROOT
 
 NAME := condor-ec2-enhanced
 EC2E_SPEC := ${NAME}.spec
