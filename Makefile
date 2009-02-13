@@ -1,16 +1,18 @@
 .PHONY: build condor-ec2-enhanced condor-ec2-enhanced-hooks
 
-RPMBUILD_DIRS := BUILD BIULDROOT RPMS SOURCES SPECS SRPMS BUILDROOT
+RPMBUILD_DIRS := BUILD BUILDROOT RPMS SOURCES SPECS SRPMS BUILDROOT
 
 NAME := condor-ec2-enhanced
 EC2E_SPEC := ${NAME}.spec
 EC2E_VERSION := $(shell grep -i version: "${EC2E_SPEC}" | awk '{print $$2}')
-EC2E_SOURCE := ${NAME}-${EC2E_VERSION}.tar.gz
+EC2E_RELEASE := $(shell grep -i 'define rel' "${EC2E_SPEC}" | awk '{print $$3}')
+EC2E_SOURCE := ${NAME}-${EC2E_VERSION}-${EC2E_RELEASE}.tar.gz
 EC2E_DIR := ${NAME}-${EC2E_VERSION}
 NAME := condor-ec2-enhanced-hooks
 EC2EHOOKS_SPEC := ${NAME}.spec
 EC2EHOOKS_VERSION := $(shell grep -i version: "${EC2EHOOKS_SPEC}" | awk '{print $$2}')
-EC2EHOOKS_SOURCE := ${NAME}-${EC2EHOOKS_VERSION}.tar.gz
+EC2EHOOKS_RELEASE := $(shell grep -i 'define rel' "${EC2EHOOKS_SPEC}" | awk '{print $$3}')
+EC2EHOOKS_SOURCE := ${NAME}-${EC2EHOOKS_VERSION}-${EC2EHOOKS_RELEASE}.tar.gz
 EC2EHOOKS_DIR := ${NAME}-${EC2EHOOKS_VERSION}
 
 build: condor-ec2-enhanced condor-ec2-enhanced-hooks

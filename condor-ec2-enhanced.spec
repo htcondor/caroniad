@@ -1,11 +1,13 @@
+%define rel 9
+
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
 Version: 1.0
-Release: 8%{?dist}
+Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
-Source0: %{name}-%{version}.tar.gz
+Source0: %{name}-%{version}-%{rel}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
 Requires: python >= 2.4
