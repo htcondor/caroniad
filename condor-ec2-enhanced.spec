@@ -1,4 +1,4 @@
-%define rel 9
+%define rel 10
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
@@ -68,6 +68,12 @@ fi
 %_sbindir/caroniad
 
 %changelog
+* Fri Feb 13 2009  <rrati@redhat> - 1.0-10
+- Rebuild bump
+
+* Fri Feb 13 2009  <rrati@redhat> - 1.0-9
+- Change source tarball name
+
 * Thu Jan 22 2009  <rrati@redhat> - 1.0-8
 - Every time a job is run, a status message denoting a run attempt
   is put in SQS (BZ480841)

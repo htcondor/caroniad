@@ -1,5 +1,5 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 12
+%define rel 13
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
@@ -67,6 +67,12 @@ touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
 %{python_sitelib}/ec2enhanced/__init__.py*
 
 %changelog
+* Fri Feb 13 2009  <rrati@redhat> - 1.0-13
+- Rebuild bump
+
+* Fri Feb 13 2009  <rrati@redhat> - 1.0-12
+- Change tarball name
+
 * Tue Feb  5 2009  <rrati@redhat> - 1.0-11
 - Fixed problems in the translate hook when a job is rerouted
 - Cleaned up classad parsing
