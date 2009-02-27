@@ -46,35 +46,40 @@ Condor if applicable.
 Arguments: None.
 Standard Input: The first line will be the route that the job matched as
 defined in Condor's configuration files followed by the job ClassAd (separated
-by the string ------ and a new line).
+by the string '------' and a new line).
 Expected Output: The transformed job.
 Exit Status: 0 for success, any non-zero value on failure.
 
 Hook: Update Job Info
 
-HOOK_UPDATE_JOB_INFO is invoked to provide status on the routed job when
-the Job Router polls the status of the routed jobs (JOB_ROUTER_POLLING_PERIOD).
+HOOK_UPDATE_JOB_INFO is invoked to provide status on the specified routed job
+when the Job Router polls the status of routed jobs (JOB_ROUTER_POLLING_PERIOD).
 
 Arguments: None.
-Standard Input: The job ClassAd to be updated.
-Expected Output: The job ClassAd with updated fields, or nothing if no update.
+Standard Input: The routed job ClassAd that is to be updated.
+Expected Output: The job attributes to be updated in the routed job, or nothing
+if no update.  Note: To prevent clashing with condor's management of job
+attributes, only attributes that are not managed by condor should be output
+from this hook.
 Exit Status: 0 for success, any non-zero value on failure.
 
 Hook: Job Finalize
 
 HOOK_JOB_FINALIZE is invoked when the Job Router has found that the job has
-completed.
+completed.  Any output from the hook is treated as an update to the source
+job.
 
-Arguments: The directory to place updated files, if applicable.
-Standard Input: The job ClassAd that completed.
-Expected Output: None.
+Arguments: None.
+Standard Input: The source job ClassAd follow by the routed job Classad that
+completed (separated by the string '------' and a new line).
+Expected Output: An updated source job ClassAd, or nothing if no update.
 Exit Status: 0 for success, any non-zero value on failure.
 
 Hook: Job Cleanup
 
 HOOK_JOB_CLEANUP is invoked when the Job Router finishes managing the job.
 This hook will be invoked regardless of whether the job completes successfully
-or not.
+or not, and must exit successfully.
 
 Arguments: None.
 Standard Input: The job ClassAd that the Job Router is done managing.
@@ -148,18 +153,6 @@ Then edit the hook configuration file to communicate with caroniad:
 ip - The IP address the hooks should use to communicate with caroniad
 port - The port the hooks should use to communicate with caroniad
 
-Lastly configure condor and caroniad to start on boot time by editing their
-init files, changing:
-
-# chkconfig: -
-
-to 
-
-# chkconfig: 2345
-
-Then execute chkconfig --del <package> and chkconfig --add <package> for
-each one, where <package> is either condor or caroniad.
-
 Package the AMI and configure the set_amazonamiid to the AMI ID once registered
 in EC2 for the route that the AMI should be used.
 
@@ -183,7 +176,7 @@ transfer_executable = false
 +WantAWS = True
 +WantArch = "INTEL" 
 +WantCPUs = 1
-+JobShouldBeSandboxed = True
++EC2RunAttempts = 0
 queue
 
 It is important to note that it is likely that the Requirements attribute
@@ -223,15 +216,14 @@ WantDisk
     Designates the amount of Disk space desired for the job.  Value is in in
     Gigabytes, so 100 == 100 Gigabytes of disk space.
 
-JobShouldBeSandboxed
-    Values: True or False
+EC2RunAttempts
+    Values: Integer
 
-    Determines if the job's input and output files should be spooled.  Should
-    always be set to True.
+    The number of times the job has been attempted to be run in the EC2 AMI.
 
 The submit file can provide user credentials for accessing EC2 if the site
 administrator has not configured credientials for that submit machine by
-adding the following entries to the submit file:
+adding the similar entries to the submit file:
 
 +AmazonAccessKey = "<path>/access_key"
 +AmazonSecretKey = "<path>/secret_access_key"
