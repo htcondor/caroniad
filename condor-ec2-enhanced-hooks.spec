@@ -1,5 +1,5 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 13
+%define rel 14
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
@@ -67,6 +67,9 @@ touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
 %{python_sitelib}/ec2enhanced/__init__.py*
 
 %changelog
+* Fri Feb 27 2009  <rrati@redhat> - 1.0-14
+- Update docs
+
 * Fri Feb 13 2009  <rrati@redhat> - 1.0-13
 - Rebuild bump
 

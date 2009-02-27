@@ -9,7 +9,8 @@ JOB_ROUTER_DEFAULTS = \
 \
     /* now modify routed job attributes */ \
     /* remove routed job if it goes on hold or stays idle for over 6 hours */ \
-    set_PeriodicRemove = JobStatus == 5 || \
+    set_PeriodicRemove = (JobStatus == 5 && \
+                          HoldReason =!= "Spooling input data files") || \
                          (JobStatus == 1 && (CurrentTime - QDate) > 3600*6); \
     set_requirements = true; \
     set_WantAWS = false; \
