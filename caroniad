@@ -43,7 +43,7 @@ class work_data(object):
       self.__SQS_msg__ = msg
       self.__slot__ = slot_num
       self.__access_time__ = time.time()
-      self.__access_lock__ = threading.RLock()
+      self.__access_lock__ = threading.Lock()
 
    def lock(self, wait=True):
       """Acquires the lock controlling access to the data in the object"""
@@ -84,7 +84,7 @@ class work_data(object):
 class global_data(object):
    def __init__(self):
       self.__work_list__ = {}
-      self.__access_lock__ = threading.RLock()
+      self.__access_lock__ = threading.Lock()
       self.__total_jobs_running__ = 0
 
    def lock(self, wait=True):
@@ -99,16 +99,13 @@ class global_data(object):
       """Add work information to list of known work items.  If work is already
          in the queue then the new work will return 0, otherwise 1 is
          returned.  Raises a general_exception if the key already exists"""
-      ret_val = 0
       work = work_data(SQS_msg, slot)
       if self.__find_work__(key) == False:
-         self.lock()
          if self.__total_jobs_running__ == 0:
             self.__work_list__.update({key:work})
             self.__total_jobs_running__ = self.__total_jobs_running__ + 1
-            ret_val = 1
-         self.unlock()
-         return ret_val
+         else:
+            raise general_exception(syslog.LOG_ERR, 'Already running %s jobs' % self.__total_jobs_running__)
       else:
          raise general_exception(syslog.LOG_WARNING, 'Key %s already exists.' % key)
 
@@ -119,12 +116,9 @@ class global_data(object):
          item when finished.  If the work with the specified key doesn't
          exist, None is returned"""
       if self.__find_work__(key) == True:
-         self.lock()
          work = self.__work_list__[key]
-         work.lock()
          del self.__work_list__[key]
          self.__total_jobs_running__ = self.__total_jobs_running__ - 1
-         self.unlock()
          return(work)
       else:
          return(None)
@@ -135,10 +129,7 @@ class global_data(object):
          of this method must unlock the work item when finished. If the
          work with the given key doesn't exist, None is returned"""
       if self.__find_work__(key) == True:
-         self.lock()
          work = self.__work_list__[key]
-         work.lock()
-         self.unlock()
          return(work)
       else:
          return(None)
@@ -147,19 +138,15 @@ class global_data(object):
       """Returns True if the given slot is currently processing work,
          False otherwise"""
       result = False
-      self.lock()
       for work in self.__work_list__.values():
          if work.slot == slot_num:
             result = True
             break
-      self.unlock()
       return(result)
 
    def __find_work__(self, key):
       """Returns True if the desired key exists, False otherwise"""
-      self.lock()
       value = self.__work_list__.has_key(key)
-      self.unlock()
       return(value)
 
    def values(self):
@@ -241,16 +228,6 @@ def lease_monitor(msg_list, max_lease_time, interval, log):
 
                # Release the message so it can be consumed by another process
                item.SQS_msg.change_visibility(5)
-
-               # Need to unlock the item because the remove_work locks it
-               item.unlock(False)
-
-            # Need to unlock here even if the message is expired because
-            # work_data uses an RLock, which counts the number of times a
-            # thread has called the lock mechanism, and at this point lock
-            # the lock has been successfully acquired via the lock call above.
-            # This lock is irrespective of the lock released if the message
-            # has been expired
             item.unlock(False)
 
       if log == True:
@@ -275,7 +252,7 @@ def handle_get_work(req_socket, reply, queue, known_items, log):
    file_attribs = ['err', 'out', 'transferoutput']
 
    try:
-      # If a job is already being process, do not attempt to process another
+      # If a job is already being processed, do not attempt to process another
       # request
       if known_items.get_total_jobs_running() > 0:
          if log == True:
@@ -291,17 +268,28 @@ def handle_get_work(req_socket, reply, queue, known_items, log):
       if slots == None:
          syslog.syslog(syslog.LOG_ERR, 'Unable to determine SlotID for request.')
       else:
-         slot = slots[0]
+         slot = slots[0].rstrip().lstrip()
 
       if log == True:
-         print '%s: Checking if slot %s is known' % (func_name, str(slot))
+         print '%s: Checking if slot %s is doing work' % (func_name, str(slot))
+         print '%s: Acquiring global message lock for slot check %s' % (func_name, str(slot))
+      known_items.lock()
+      if log == True:
+         print '%s: Acquired global message lock for slot check %s' % (func_name, str(slot))
       if known_items.slot_in_use(slot) == True:
          if log == True:
-            print '%s: known slot %s' % (func_name, str(slot))
+            print '%s: slot %s is already doing work' % (func_name, str(slot))
          reply.data = ''
          req_socket.send(pickle.dumps(reply, 2))
          close_socket(req_socket)
+         known_items.unlock()
+         if log == True
+            print '%s: Released global message lock for slot check %s' % (func_name, str(slot))
          return(SUCCESS)
+      known_items.unlock()
+      if log == True:
+         print '%s: slot %s is not doing work' % (func_name, str(slot))
+         print '%s: Released global message lock for slot check %s' % (func_name, str(slot))
 
       # Get the work off the SQS work queue if it exists
       valid_message = 0
@@ -384,15 +372,22 @@ def handle_get_work(req_socket, reply, queue, known_items, log):
       # deleted or released as needed
       if log == True:
          print '%s: Adding msg id %s to known items' % (func_name, msg_num)
-      if known_items.add_work(msg_num, q_msg, slot) == 0:
+      known_items.lock()
+      try:
+         known_items.add_work(msg_num, q_msg, slot)
+      except general_exception, error:
          # Already processing a job, so adding the job to the list of
          # known work was rejected.  Release the message and make sure the
          # job won't be processed
          if log == True:
             print '%s: Adding job to list of work was rejected.  Already processing %s job(s)' % (func_name, known_items.get_total_jobs_running())
+         known_items.unlock()
          q_msg.change_visibility(5)
-         reply.data = ''
-   
+         raise general_exception(syslog.LOG_ERR, '%s: %s' % (func_name, error.msgs))
+      known_items.unlock()
+      if log == True:
+         print '%s: Released global message lock for %s' % (func_name, msg_num)
+
       # Send the work to the requesting client
       req_socket.send(pickle.dumps(reply, 2))
       close_socket(req_socket)
@@ -415,10 +410,15 @@ def handle_reply_fetch(msg, queue, known_items, log):
       # Find the SQSMessageId in the message received
       message_ids = grep('^SQSMessageId\s*=\s*"(.+)"$', msg.data)
       if message_ids == None:
-         raise general_exception(syslog.LOG_ERR, msg.data, 'Unable to find SQS in exit message')
+         raise general_exception(syslog.LOG_ERR, msg.data, '%s: Unable to find SQS in exit message' % func_name)
       else:
-         message_id = message_ids[0]
+         message_id = message_ids[0].rstrip().lstrip()
 
+      if log == True:
+         print '%s: Acquiring global message lock for %s' % (func_name, str(message_id))
+      known_items.lock()
+      if log == True:
+         print '%s: Acquired global message lock for %s' % (func_name, str(message_id))
       if msg.type == condor_wf_types.reply_claim_reject:
          saved_work = known_items.remove_work(message_id)
       else:
@@ -427,54 +427,76 @@ def handle_reply_fetch(msg, queue, known_items, log):
       if saved_work == None:
          # Couldn't find the SQS message that corresponds to the SQSMessageId
          # in the exit message.  This is bad and shouldn't happen.
-         raise general_exception(syslog.LOG_ERR, 'Unable to find stored SQS message with SQSMessageId %s.' % str(message_id))
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for %s' % (func_name, str(message_id))
+         raise general_exception(syslog.LOG_ERR, '%s: Unable to find stored SQS message with SQSMessageId %s.' % (func_name, str(message_id)))
       else:
+         if log == True:
+            print '%s: Acquiring lock for %s' % (func_name, str(message_id))
+         saved_work.lock()
+         if log == True:
+            print '%s: Acquired lock for %s' % (func_name, str(message_id))
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for %s' % (func_name, str(message_id))
+
+         # Only want the job ClassAd and not the Slot Class Ad.  Since
+         # the job classad is listed first followed by the Slot Class Ad
+         # and separated by a series of dashes (-), cycle through the data
+         # and look for a number of dashes and then quit.  Also want
+         # to remove some attributes that shouldn't have updated data
+         # sent to the submitter.
+         result_ad = ''
+         orig_owner = ''
+         for line in msg.data.split('\n'):
+            match = grep('^([^=]*)\s*=\s*(.+)$', line)
+            if re.match('---', line) != None:
+               break
+            elif match != None and match[0] != None:
+               if match[0].rstrip().lower() in remove_attribs:
+                  continue
+               elif match[0].rstrip().lower() == 'jobstatus':
+                  result_ad += 'JobStatus = 2\n'
+                  continue
+               elif match[0].rstrip() == 'EC2OrigOwner' and match[1] != None:
+                  orig_owner = match[1].rstrip()
+                  continue
+               elif match[0].rstrip().lower() == 'owner':
+                  continue
+            if line != '':
+               result_ad += line + "\n"
+         result_ad += 'Owner = %s\n' % orig_owner
+         result_ad += 'EC2JobAttempted = True\n'
+
          try:
-            # Only want the job ClassAd and not the Slot Class Ad.  Since
-            # the job classad is listed first followed by the Slot Class Ad
-            # and separated by a series of dashes (-), cycle through the data
-            # and look for a number of dashes and then quit.  Also want
-            # to remove some attributes that shouldn't have updated data
-            # sent to the submitter.
-            result_ad = ''
-            orig_owner = ''
-            for line in msg.data.split('\n'):
-               match = grep('^([^=]*)\s*=\s*(.+)$', line)
-               if re.match('---', line) != None:
-                  break
-               elif match != None and match[0] != None:
-                  if match[0].rstrip().lower() in remove_attribs:
-                     continue
-                  elif match[0].rstrip().lower() == 'jobstatus':
-                     result_ad += 'JobStatus = 2\n'
-                     continue
-                  elif match[0].rstrip() == 'EC2OrigOwner' and match[1] != None:
-                     orig_owner = match[1].rstrip()
-                     continue
-                  elif match[0].rstrip().lower() == 'owner':
-                     continue
-               if line != '':
-                  result_ad += line + "\n"
-            result_ad += 'Owner = %s\n' % orig_owner
-            result_ad += 'EC2JobAttempted = True\n'
-
             response = pickle.loads(saved_work.SQS_msg.get_body())
-            response.class_ad = result_ad
-
-            # Send the results to the appropriate SQS queue
-            try:
-               queue.write(Message(body=pickle.dumps(response)))
-            except:
-               saved_work.unlock()
-               raise general_exception(syslog.LOG_ERR, 'Error: Unable to write reply message to SQS')
-
-            if msg.type == condor_wf_types.reply_claim_reject:
-               # Reset the visibility timer so it can be read again quickly.
-               saved_work.SQS_msg.change_visibility(5)
-         finally:
-            if log == True:
-               print '%s: Releasing lock on %s' % (func_name, str(message_id))
+         except:
+            saved_work.SQS_msg.change_visibility(5)
             saved_work.unlock()
+            raise general_exception(syslog.LOG_ERR, '%s: Failed to create response message for id "%s"' % (func_name, message_id))
+         response.class_ad = result_ad
+
+         # Send the results to the appropriate SQS queue
+         try:
+            queue.write(Message(body=pickle.dumps(response)))
+         except:
+            saved_work.SQS_msg.change_visibility(5)
+            saved_work.unlock()
+            raise general_exception(syslog.LOG_ERR, '%s: Error: Unable to write reply message to SQS' % func_name)
+
+         if msg.type == condor_wf_types.reply_claim_reject:
+            # Reset the visibility timer so it can be read again quickly.
+            try:
+               saved_work.SQS_msg.change_visibility(5)
+            except:
+               print '%s: Unable to reset visibility timer on "%s"' (func_name, str(message_id))
+            if log == True:
+               print '%s: Work rejected %s' % (func_name, str(message_id))
+
+         if log == True:
+            print '%s: Releasing lock on %s' % (func_name, str(message_id))
+         saved_work.unlock()
 
       return(SUCCESS)
 
@@ -494,57 +516,81 @@ def handle_prepare_job(req_socket, reply, s3_storage, known_items, log):
       # Find the SQSMessageId in the message received
       message_ids = grep('^SQSMessageId\s*=\s*"(.+)"$', reply.data)
       if message_ids == None:
-         raise general_exception(syslog.LOG_ERR, reply.data, 'Unable to find SQSMessageId in prepare job message')
+         raise general_exception(syslog.LOG_ERR, reply.data, '%s: Unable to find SQSMessageId in prepare job message' % func_name)
       else:
-         message_id = message_ids[0]
+         message_id = message_ids[0].rstrip().lstrip()
 
-      # Find the Current Working Directory  of the originating process
+      # Find the Current Working Directory of the originating process
       # in the message received
       work_cwd = grep('^OriginatingCWD\s*=\s*"(.+)"$', reply.data)[0]
 
+      if log == True:
+         print '%s: Acquiring global message lock for %s' % (func_name, str(message_id))
+      known_items.lock()
+      if log == True:
+         print '%s: Acquired global message lock for %s' % (func_name, str(message_id))
       saved_work = known_items.get_work(message_id)
       if saved_work == None:
          # Couldn't find the SQS message that corresponds to the SQSMessageId
          # in the exit message.  This is bad and shouldn't happen.
-         raise general_exception(syslog.LOG_ERR, 'Unable to find stored SQS message with SQSMessageId %s' % str(message_id))
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for %s' % (func_name, str(m
+essage_id))
+         raise general_exception(syslog.LOG_ERR, '%s: Unable to find stored SQS message with SQSMessageId %s' % (func_name, str(message_id)))
       else:
+         if log == True:
+            print '%s: Acquiring lock for %s' % (func_name, str(message_id))
+         saved_work.lock()
+         if log == True:
+            print '%s: Acquired lock for %s' % (func_name, str(message_id))
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for %s' % (func_name, str(message_id))
 
+         # If the S3 parameters are not None, then there is data to pull
+         # from S3 for this job
          try:
-            # If the S3 parameters are not None, then there is data to pull
-            # from S3 for this job
             msg = pickle.loads(saved_work.SQS_msg.get_body())
-            if msg.s3_bucket != None and msg.s3_key != None:
-               # Retrive the S3 key from the message
-               try:
-                  s3_bucket = s3_storage.get_bucket(msg.s3_bucket)
-                  s3_key = Key(s3_bucket)
-               except:
-                  saved_work.SQS_msg.change_visibility(5)
-                  saved_work.unlock()
-                  raise general_exception(syslog.LOG_ERR, 'Error: Unable to access S3 to prepare job for execution')
-               s3_key.key = msg.s3_key
-
-               # Retrieve the archived file from S3 and put it into the 
-               # directory for the job
-               input_filename = work_cwd + '/data.tar.gz'
-               try:
-                  s3_key.get_contents_to_filename(input_filename)
-               except:
-                  saved_work.SQS_msg.change_visibility(5)
-                  saved_work.unlock()
-                  raise general_exception(syslog.LOG_ERR, 'Error: Unable to get job data from S3')
-                  
-               reply.data = input_filename
-            else:
-               reply.data = ''
-            
-            # Send the information about the archive file to the requester
-            req_socket.send(pickle.dumps(reply, 2))
-            close_socket(req_socket)
-         finally:
-            if log == True:
-               print '%s: Releasing lock on %s' % (func_name, str(message_id))
+         except:
+            saved_work.SQS_msg.change_visibility(5)
+            known_items.remove_work(message_id)
             saved_work.unlock()
+            raise general_exception(syslog.LOG_ERR, '%s: Failed to retrieve job details for id "%s"' % (func_name, message_id))
+         if msg.s3_bucket != None and msg.s3_key != None:
+            # Retrive the S3 key from the message
+            try:
+               s3_bucket = s3_storage.get_bucket(msg.s3_bucket)
+               s3_key = Key(s3_bucket)
+            except:
+               saved_work.SQS_msg.change_visibility(5)
+               known_items.remove_work(message_id)
+               saved_work.unlock()
+               raise general_exception(syslog.LOG_ERR, 'Error: Unable to access S3 to prepare job for execution')
+            s3_key.key = msg.s3_key
+
+            # Retrieve the archived file from S3 and put it into the 
+            # directory for the job
+            input_filename = work_cwd + '/data.tar.gz'
+            try:
+               s3_key.get_contents_to_filename(input_filename)
+            except:
+               saved_work.SQS_msg.change_visibility(5)
+               known_items.remove_work(message_id)
+               saved_work.unlock()
+               raise general_exception(syslog.LOG_ERR, 'Error: Unable to get job data from S3')
+                  
+            reply.data = input_filename
+         else:
+            reply.data = ''
+            
+         # Send the information about the archive file to the requester
+         req_socket.send(pickle.dumps(reply, 2))
+         close_socket(req_socket)
+
+         if log == True:
+            print '%s: Releasing lock on %s' % (func_name, str(message_id))
+         saved_work.unlock()
       return(SUCCESS)
 
    except general_exception, error:
@@ -563,53 +609,72 @@ def handle_update_job_status(msg, queue, known_items, log):
       # Find the SQSMessageId in the message received
       message_ids = grep('^SQSMessageId\s*=\s*"(.+)"$', msg.data)
       if message_ids == None:
-         raise general_exception(syslog.LOG_ERR, msg.data, 'Unable to find SQSMessageId in exit message')
+         raise general_exception(syslog.LOG_ERR, msg.data, '%s: Unable to find SQSMessageId in exit message' % func_name)
       else:
-         message_id = message_ids[0]
+         message_id = message_ids[0].rstrip().lstrip()
 
-      saved_work = known_items.get_work(message_id)
       if log == True:
-         print '%s: Returned from get_work for message %s' % (func_name, str(message_id))
+         print '%s: Acquiring global message lock for %s' % (func_name, str(mes
+sage_id))
+      known_items.lock()
+      if log == True:
+         print '%s: Acquired global message lock for %s' % (func_name, str(message_id))
+      saved_work = known_items.get_work(message_id)
       if saved_work == None:
          # Couldn't find the SQS message that corresponds to the SQSMessageId
          # in the exit message.  This is bad and shouldn't happen.
-         raise general_exception(syslog.LOG_ERR, 'Unable to find stored SQS message with SQSMessageId %s' % str(message_id))
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for %s' % (func_name, str(message_id))
+         raise general_exception(syslog.LOG_ERR, '%s: Unable to find stored SQS message with SQSMessageId %s' % (message_id, str(message_id)))
       else:
+         if log == True:
+            print '%s: Acquiring lock for %s' % (func_name, str(message_id))
+         saved_work.lock()
+         if log == True:
+            print '%s: Acquired lock for %s' % (func_name, str(message_id))
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for %s' % (func_name, str(message_id))
+
+         # Remove some attributes that shouldn't have updated data
+         # sent to the submitter. The Class Ad doesn't reflect the
+         # appropriate state, so change it to say the job is running(2).
+         result_ad = ''
+         for line in msg.data.split('\n'):
+            match = grep('^([^=]*)\s*=\s*(.+)$', line)
+            if match != None and match[0] != None:
+               if match[0].rstrip().lower() in remove_attribs:
+                  continue
+               elif match[0].rstrip().lower() == 'jobstatus':
+                  result_ad += 'JobStatus = 2\n'
+                  continue
+               elif match[0].rstrip() == 'EC2OrigOwner' and match[1] != None:
+                  orig_owner = match[1].rstrip()
+                  continue
+               elif match[0].rstrip().lower() == 'owner':
+                  continue
+            if line != '':
+               result_ad += line + "\n"
+         result_ad += 'Owner = %s\n' % orig_owner
 
          try:
-            # Remove some attributes that shouldn't have updated data
-            # sent to the submitter. The Class Ad doesn't reflect the
-            # appropriate state, so change it to say the job is running(2).
-            result_ad = ''
-            for line in msg.data.split('\n'):
-               match = grep('^([^=]*)\s*=\s*(.+)$', line)
-               if match != None and match[0] != None:
-                  if match[0].rstrip().lower() in remove_attribs:
-                     continue
-                  elif match[0].rstrip().lower() == 'jobstatus':
-                     result_ad += 'JobStatus = 2\n'
-                     continue
-                  elif match[0].rstrip() == 'EC2OrigOwner' and match[1] != None:
-                     orig_owner = match[1].rstrip()
-                     continue
-                  elif match[0].rstrip().lower() == 'owner':
-                     continue
-               if line != '':
-                  result_ad += line + "\n"
-            result_ad += 'Owner = %s\n' % orig_owner
-
             response = pickle.loads(saved_work.SQS_msg.get_body())
-            response.class_ad = result_ad
-
-            # Send the results to the appropriate SQS queue
-            try:
-               queue.write(Message(body=pickle.dumps(response)))
-            except:
-               syslog.syslog(syslog.LOG_WARNING, 'Warning: Unable to write status message to SQS')
-         finally:
-            if log == True:
-               print '%s: Releasing lock on %s' % (func_name, str(message_id))
+         except:
             saved_work.unlock()
+            raise general_exception(syslog.LOG_ERR, '%s: Failed to retrieve job details for id "%s"' % (func_name, message_id))
+         response.class_ad = result_ad
+
+         # Send the results to the appropriate SQS queue
+         try:
+            queue.write(Message(body=pickle.dumps(response)))
+         except:
+            saved_work.unlock()
+            syslog.syslog(syslog.LOG_WARNING, '%s: Warning: Unable to write status message to SQS' % func_name)
+
+         if log == True:
+            print '%s: Releasing lock on %s' % (func_name, str(message_id))
+         saved_work.unlock()
       return(SUCCESS)
 
    except general_exception, error:
@@ -634,20 +699,22 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
       # Determine the slot that is reporting results
       slots = grep('^WF_REQ_SLOT\s*=\s*"(.+)"$', msg.data)
       if slots == None:
-         syslog.syslog(syslog.LOG_WARNING, 'Unable to determine SlotID for results.')
+         syslog.syslog(syslog.LOG_WARNING, '%s: Unable to determine SlotID for results.' % func_name)
       else:
          # Verify the slot sending results is known to be in use.  If not,
          # somehow results have been send from an unknown slot.
-         slot = slots[0]
+         slot = slots[0].rstrip().lstrip()
+         known_items.lock()
          if known_items.slot_in_use(slot) == False:
-            syslog.syslog(syslog.LOG_WARNING, 'Received exit message from unknown slot %s' % slot)
+            syslog.syslog(syslog.LOG_WARNING, '%s: Received exit message from unknown slot %s' % (func_name, slot))
+         known_items.unlock()
 
       # Find the SQSMessageId in the message we received
       message_ids = grep('^SQSMessageId\s*=\s*"(.+)"$', msg.data)
       if message_ids == None:
-         raise general_exception(syslog.LOG_ERR, msg.data, 'Unable to find SQSMessageId in exit message')
+         raise general_exception(syslog.LOG_ERR, msg.data, '%s: Unable to find SQSMessageId in exit message' % func_name)
       else:
-         message_id = message_ids[0]
+         message_id = message_ids[0].rstrip().lstrip()
 
       # Find the Current Working Directory of the originating process
       # in the message received
@@ -655,17 +722,39 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
 
       # Retrieve the SQS message from the list of known messages so it
       # can be acknowledged or released
-      saved_work = known_items.get_work(message_id)
+      if log == True:
+         print '%s: Acquiring global message lock for %s' % (func_name, str(message_id))
+      known_items.lock()
+      if log == True:
+         print '%s: Acquired global message lock for %s' % (func_name, str(message_id))
+      saved_work = known_items.remove_work(message_id)
       if saved_work == None:
          # Couldn't find the SQS message that corresponds to the SQSMessageId
          # in the exit message.  This is bad and shouldn't happen.
-         raise general_exception(syslog.LOG_ERR, 'Unable to find stored SQS message with SQSMessageId %s.  Message cannot be acknowledged nor results sent!' % str(message_id))
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for %s' % (func_name, str(message_id))
+         raise general_exception(syslog.LOG_ERR, '%s: Unable to find stored SQS message with SQSMessageId %s.  Message cannot be acknowledged nor results sent!' % (func_name, str(message_id)))
       else:
+         if log == True:
+            print '%s: Acquiring lock for %s' % (func_name, str(message_id))
+         saved_work.lock()
+         if log == True:
+            print '%s: Acquired lock for %s' % (func_name, str(message_id))
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for %s' % (func_name, str(message_id))
+
          try:
             # Retrieve the saved classad information for the
             # results message.
             results = pickle.loads(saved_work.SQS_msg.get_body())
+         except:
+            saved_work.SQS_msg.change_visibility(5)
+            saved_work.unlock()
+            syslog.syslog(syslog.LOG_WARNING, '%s: Unable to retrive job information for id %s' % (func_name, message_id))
 
+         try:
             # If the S3 key is None, then there wasn't any input data for this
             # job so we'll need to create a new key to store the data in.
             # Otherwise, reuse the values from the message
@@ -681,9 +770,18 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
                s3_key.key = str(aws_access_key) + '-' + str(global_id)
                results.s3_key = s3_key.key
                msg.data += 'S3KeyID = "%s"\n' % s3_key.key
+         except:
+            saved_work.SQS_msg.change_visibility(5)
+            saved_work.unlock()
+            syslog.syslog(syslog.LOG_WARNING, '%s: Unable to create storage bucket in S3 for id %s' % (func_name, message_id))
 
-            # Create the list of files to put into the results archive
-            orig_cwd = os.getcwd()
+         # Create the list of files to put into the results archive
+         if os.path.exists(work_cwd) == False:
+            saved_work.SQS_msg.change_visibility(5)
+            saved_work.unlock()
+            raise general_exception(syslog.LOG_ERR, '%s: Unable to change to exe dir "%s" for id "%s"' % (func_name, work_cwd, str(message_id)))
+
+         try:
             os.chdir(work_cwd)
             transfer_files = grep('^TransferOutput\s*=\s*"(.*)"$', msg.data)
             if transfer_files != None and transfer_files[0] != None:
@@ -704,97 +802,97 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
                      file_list.append(os.path.basename(file.rstrip()))
             else:
                file_list = os.listdir(".")
+         except:
+            saved_work.unlock()
+            saved_work.SQS_msg.change_visibility(5)
+            raise general_exception(syslog.LOG_ERR, '%s: Failed to create list of files for results archive for id "%s"' % (func_name, str(message_id)))
 
-            # Archive all the important files
-            results_filename = work_cwd + '/results.tar.gz'
+         # Archive all the important files
+         results_filename = work_cwd + '/results.tar.gz'
+         try:
             results_file = tarfile.open(results_filename, 'w:gz')
-            for file in file_list:
-               if os.path.exists(file.rstrip()):
-                  # Only parse the dir/file path if it actually is a dir/file
-                  # format (ie doesn't end in /)
-                  if os.path.dirname(file.rstrip()) != '' and \
-                     os.path.basename(file.rstrip()) != '':
-                     os.chdir(os.path.dirname(file.rstrip()))
+         except:
+            saved_work.unlock()
+            saved_work.SQS_msg.change_visibility(5)
+            raise general_exception(syslog.LOG_ERR, '%s: Failed to open archive file for writing for id "%s"' % (func_name, str(message_id)))
+
+         for file in file_list:
+            if os.path.exists(file.rstrip()):
+               # Only parse the dir/file path if it actually is a dir/file
+               # format (ie doesn't end in /)
+               if os.path.dirname(file.rstrip()) != '' and \
+                  os.path.basename(file.rstrip()) != '' and \
+                  os.path.exists(file.rstrip()) == True:
+                  os.chdir(os.path.dirname(file.rstrip()))
+                  try:
                      results_file.add(os.path.basename(file.rstrip()))
-                     os.chdir(work_cwd)
-                  else:
-                     results_file.add(file.rstrip())
+                  except:
+                     saved_work.unlock()
+                     saved_work.SQS_msg.change_visibility(5)
+                     raise general_exception(syslog.LOG_ERR, '%s: Failed to write file "%s" to archive for id "%s"' % (func_name, file, str(message_id)))
+                  os.chdir(work_cwd)
+               else:
+                  results_file.add(file.rstrip())
+         try:
             results_file.close()
-            os.chdir(orig_cwd)
+         except:
+            saved_work.unlock()
+            saved_work.SQS_msg.change_visibility(5)
+            raise general_exception(syslog.LOG_ERR, '%s: Failed to write archive to disk for id "%s"' % (func_name, str(message_id)))
 
-            if msg.type == condor_wf_types.exit_exit:
-               normal_exit = 1
-               # Job exited normally, so upload the sandbox to S3,
-               # and remove the message on the SQS work queue
-               if log == True:
-                  print '%s: Normal exit' % func_name
+         if msg.type == condor_wf_types.exit_exit:
+            normal_exit = 1
+            # Job exited normally, so upload the sandbox to S3,
+            # and remove the message on the SQS work queue
+            if log == True:
+               print '%s: Normal exit' % func_name
 
-               # The Class Ad we have doesn't reflect the appropriate state, so 
-               # change it to say the job is completed(4).  Also remove
-               # attributes that shouldn't have updated data sent to the
-               # originater.
-               result_ad = ''
-               start_time = 0
-               run_time = 0
-               orig_owner = ''
-               for line in msg.data.split('\n'):
-                  match = grep('^([^=]*)\s*=\s*(.+)$', line)
-                  if match != None and match[0] != None:
-                     if match[0].rstrip().lower() == 'jobstatus':
-                        result_ad += 'JobStatus = 4\n'
-                        continue
-                     elif match[0].rstrip().lower() in remove_attribs:
-                        continue
-                     elif match[0].rstrip() == 'EC2OrigOwner' and \
-                          match[1] != None:
-                        orig_owner = match[1].rstrip()
-                        continue
-                  if line != '':
-                     result_ad += line + "\n"
+            # The Class Ad we have doesn't reflect the appropriate state, so 
+            # change it to say the job is completed(4).  Also remove
+            # attributes that shouldn't have updated data sent to the
+            # originater.
+            result_ad = ''
+            start_time = 0
+            run_time = 0
+            orig_owner = ''
+            for line in msg.data.split('\n'):
+               match = grep('^([^=]*)\s*=\s*(.+)$', line)
+               if match != None and match[0] != None:
+                  if match[0].rstrip().lower() == 'jobstatus':
+                     result_ad += 'JobStatus = 4\n'
+                     continue
+                  elif match[0].rstrip().lower() in remove_attribs:
+                     continue
+                  elif match[0].rstrip() == 'EC2OrigOwner' and \
+                       match[1] != None:
+                     orig_owner = match[1].rstrip()
+                     continue
+               if line != '':
+                  result_ad += line + "\n"
 
-                  # Set the job completion time by finding the start time and
-                  # job duration from the class ad and add them together.
-                  match = re.match('^JobStartDate\s*=\s*(.+)$', line)
-                  if match != None and match.groups() != None:
-                     start_time = int(match.groups()[0])
+            # Set the job completion time by finding the start time and
+            # job duration from the class ad and add them together.
+            match = re.match('^JobStartDate\s*=\s*(.+)$', line)
+            if match != None and match.groups() != None:
+               start_time = int(match.groups()[0])
 
-                  match = re.match('^JobDuration\s*=\s*(.+)$', line)
-                  if match != None and match.groups() != None:
-                     run_time = int(round(float(match.groups()[0])))
+            match = re.match('^JobDuration\s*=\s*(.+)$', line)
+            if match != None and match.groups() != None:
+               run_time = int(round(float(match.groups()[0])))
 
-               result_ad += 'Owner = %s\n' % orig_owner
-               result_ad += 'JobFinishedHookDone = ' + str(start_time + run_time) + '\n'
-               results.class_ad = result_ad
+            result_ad += 'Owner = %s\n' % orig_owner
+            result_ad += 'JobFinishedHookDone = ' + str(start_time + run_time) + '\n'
+            results.class_ad = result_ad
 
-               # Upload the sandbox to S3
-               try:
-                  s3_key.set_contents_from_filename(results_filename)
-               except:
-                  # Reset the visibility timer so it can be read again quickly.
-                  known_items.remove_work(message_id)
-                  saved_work.SQS_msg.change_visibility(5)
-                  saved_work.unlock()
-                  raise general_exception(syslog.LOG_ERR, 'Error: Unable to write results to S3')
-
-               # Remove the message from the SQS queue
-               try:
-                  work_q.delete_message(saved_work.SQS_msg)
-               except:
-                  # Don't raise an exception here because the job has completed
-                  # processing, but SQS is having issues.  The system shutdown
-                  # will prevent it from being run again
-                  saved_work.unlock()
-                  syslog.syslog(syslog.LOG_ERR, 'Error: Unable to delete SQS message')
-            else:
-               # Job didn't exit normally
-               if log == True:
-                  print '%s: Not normal exit: %s' % (func_name, str(msg.type))
-
+            # Upload the sandbox to S3
+            try:
+               s3_key.set_contents_from_filename(results_filename)
+            except:
                # Reset the visibility timer so it can be read again quickly.
-               known_items.remove_work(message_id)
                saved_work.SQS_msg.change_visibility(5)
                saved_work.unlock()
-         finally:
+               raise general_exception(syslog.LOG_ERR, 'Error: Unable to write results to S3')
+
             # Send the results to the appropriate SQS queue
             try:
                results_q.write(Message(body=pickle.dumps(results)))
@@ -802,8 +900,17 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
                # Reset the visibility timer so it can be read again quickly.
                saved_work.SQS_msg.change_visibility(5)
                saved_work.unlock()
-               known_items.remove_work(message_id)
                raise general_exception(syslog.LOG_ERR, 'Error: Unable to write job results message to SQS')
+
+            # Remove the message from the SQS queue
+            try:
+               work_q.delete_message(saved_work.SQS_msg)
+            except:
+               # Don't raise an exception here because the job has completed
+               # processing, but SQS is having issues.  The system shutdown
+               # will prevent it from being run again
+               saved_work.unlock()
+               syslog.syslog(syslog.LOG_ERR, 'Error: Unable to delete SQS message')
             saved_work.unlock()
 
             if normal_exit == 1:
@@ -814,6 +921,14 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
 
                # Shutdown now that the job has finished
                call(['shutdown',  '-h',  '-P',  'now'])
+         else:
+            # Job didn't exit normally
+            if log == True:
+               print '%s: Not normal exit: %s' % (func_name, str(msg.type))
+
+            # Reset the visibility timer so it can be read again quickly.
+            saved_work.SQS_msg.change_visibility(5)
+            saved_work.unlock()
 
       # Send acknowledgement to the originator that exit work is complete
       req_socket.send('Completed')
