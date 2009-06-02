@@ -15,7 +15,7 @@ Requires: python >= 2.3
 Requires: condor >= 7.2.0-4
 Requires: condor-job-hooks-common >= 1.0-4
 Requires: condor-ec2-enhanced-hooks-common
-Requires: python-boto >= 1.0a
+Requires: python-boto >= 1.7a
 Requires: openssl
 
 %description

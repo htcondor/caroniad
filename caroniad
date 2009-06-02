@@ -212,7 +212,7 @@ def time_monitor(msg_list, sock, mins):
          shutdown_sockets(sock, None)
          call(['shutdown',  '-h',  '-P',  'now'])
 
-def lease_monitor(msg_list, max_lease_time, interval, log):
+def lease_monitor(msg_list, max_lease_time, interval, sqs_con, queue, log):
    """Monitor all work for lease expiration.  If a lease expired, the work
       is released"""
    func_name = "lease_monitor"
@@ -240,7 +240,7 @@ def lease_monitor(msg_list, max_lease_time, interval, log):
                msg_list.remove_work(msg_id)
 
                # Release the message so it can be consumed by another process
-               item.SQS_msg.change_visibility(5)
+               sqs_con.change_message_visibility(queue, item.SQS_msg.receipt_handle, 5)
 
                # Need to unlock the item because the remove_work locks it
                item.unlock(False)
@@ -263,7 +263,7 @@ def lease_monitor(msg_list, max_lease_time, interval, log):
 def exit_signal_handler(signum, frame):
    raise exit_signal('Exit signal %s received' % signum)
 
-def handle_get_work(req_socket, reply, queue, known_items, log):
+def handle_get_work(req_socket, reply, sqs_con, queue, known_items, log):
    """Retrieve a message from an SQS queue and send it back to the
       requesting client"""
    func_name = "handle_get_work"
@@ -324,7 +324,7 @@ def handle_get_work(req_socket, reply, queue, known_items, log):
          reply.data = msg.class_ad
          job_run_time = grep('^JobLeaseDuration\s*=\s*(.+)$', reply.data)
          if job_run_time != None:
-            q_msg.change_visibility(job_run_time[0])
+            sqs_con.change_message_visibility(queue, q_msg.receipt_handle, job_run_time[0])
       else:
          reply.data = ''
          req_socket.send(pickle.dumps(reply, 2))
@@ -390,7 +390,7 @@ def handle_get_work(req_socket, reply, queue, known_items, log):
          # job won't be processed
          if log == True:
             print '%s: Adding job to list of work was rejected.  Already processing %s job(s)' % (func_name, known_items.get_total_jobs_running())
-         q_msg.change_visibility(5)
+         sqs_con.change_message_visibility(queue, q_msg.receipt_handle, 5)
          reply.data = ''
    
       # Send the work to the requesting client
@@ -402,7 +402,7 @@ def handle_get_work(req_socket, reply, queue, known_items, log):
       log_messages(error)
       return(FAILURE)
 
-def handle_reply_fetch(msg, queue, known_items, log):
+def handle_reply_fetch(msg, sqs_con, work_q, status_q, known_items, log):
    """Send the data from a reply claim hook to a results SQS queue.  Release
       the lock on the receiving SQS queue in the case of a reject"""
    func_name = "handle_reply_fetch"
@@ -463,14 +463,14 @@ def handle_reply_fetch(msg, queue, known_items, log):
 
             # Send the results to the appropriate SQS queue
             try:
-               queue.write(Message(body=pickle.dumps(response)))
+               status_q.write(Message(body=pickle.dumps(response)))
             except:
                saved_work.unlock()
                raise general_exception(syslog.LOG_ERR, 'Error: Unable to write reply message to SQS')
 
             if msg.type == condor_wf_types.reply_claim_reject:
                # Reset the visibility timer so it can be read again quickly.
-               saved_work.SQS_msg.change_visibility(5)
+               sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
          finally:
             if log == True:
                print '%s: Releasing lock on %s' % (func_name, str(message_id))
@@ -482,7 +482,7 @@ def handle_reply_fetch(msg, queue, known_items, log):
       log_messages(error)
       return(FAILURE)
 
-def handle_prepare_job(req_socket, reply, s3_storage, known_items, log):
+def handle_prepare_job(req_socket, reply, s3_storage, sqs_con, queue, known_items, log):
    """Prepare the environment for the job.  This includes accessing S3
       for any data specific to the job and providing it to codor's 
       temporary execute directory."""
@@ -519,7 +519,7 @@ def handle_prepare_job(req_socket, reply, s3_storage, known_items, log):
                   s3_bucket = s3_storage.get_bucket(msg.s3_bucket)
                   s3_key = Key(s3_bucket)
                except:
-                  saved_work.SQS_msg.change_visibility(5)
+                  sqs_con.change_message_visibility(queue, saved_work.SQS_msg.receipt_handle, 5)
                   saved_work.unlock()
                   raise general_exception(syslog.LOG_ERR, 'Error: Unable to access S3 to prepare job for execution')
                s3_key.key = msg.s3_key
@@ -530,7 +530,7 @@ def handle_prepare_job(req_socket, reply, s3_storage, known_items, log):
                try:
                   s3_key.get_contents_to_filename(input_filename)
                except:
-                  saved_work.SQS_msg.change_visibility(5)
+                  sqs_con.change_message_visibility(queue, saved_work.SQS_msg.receipt_handle, 5)
                   saved_work.unlock()
                   raise general_exception(syslog.LOG_ERR, 'Error: Unable to get job data from S3')
                   
@@ -616,7 +616,7 @@ def handle_update_job_status(msg, queue, known_items, log):
       log_messages(error)
       return(FAILURE)
 
-def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log):
+def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_items, log):
    """The job exited, so handle the reasoning appropriately.  If the
       job exited normally, then remove the work job from the SQS queue,
       otherwise release the lock on the work.  Always place the results
@@ -772,7 +772,7 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
                except:
                   # Reset the visibility timer so it can be read again quickly.
                   known_items.remove_work(message_id)
-                  saved_work.SQS_msg.change_visibility(5)
+                  sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
                   saved_work.unlock()
                   raise general_exception(syslog.LOG_ERR, 'Error: Unable to write results to S3')
 
@@ -792,7 +792,7 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
 
                # Reset the visibility timer so it can be read again quickly.
                known_items.remove_work(message_id)
-               saved_work.SQS_msg.change_visibility(5)
+               sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
                saved_work.unlock()
          finally:
             # Send the results to the appropriate SQS queue
@@ -800,7 +800,7 @@ def handle_exit(req_socket, msg, s3_storage, work_q, results_q, known_items, log
                results_q.write(Message(body=pickle.dumps(results)))
             except:
                # Reset the visibility timer so it can be read again quickly.
-               saved_work.SQS_msg.change_visibility(5)
+               sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
                saved_work.unlock()
                known_items.remove_work(message_id)
                raise general_exception(syslog.LOG_ERR, 'Error: Unable to write job results message to SQS')
@@ -937,7 +937,7 @@ def main(argv=None):
          call(['shutdown',  '-h',  '-P',  'now'])
    
       # Create a thread to monitor work expiration times
-      monitor_thread = threading.Thread(target=lease_monitor, args=(share_data, sqs_config['lease_time'], sqs_config['lease_check_interval'], debug_logging))
+      monitor_thread = threading.Thread(target=lease_monitor, args=(share_data, sqs_config['lease_time'], sqs_config['lease_check_interval'], sqs_connection, work_queue, debug_logging))
       monitor_thread.setDaemon(True)
       monitor_thread.start()
 
@@ -964,19 +964,19 @@ def main(argv=None):
 
          # Set up a child thread to perform the desired action
          if condor_msg.type == condor_wf_types.get_work:
-            child = threading.Thread(target=handle_get_work, args=(sock, condor_msg, work_queue, share_data, debug_logging))
+            child = threading.Thread(target=handle_get_work, args=(sock, condor_msg, sqs_connection, work_queue, share_data, debug_logging))
          elif condor_msg.type == condor_wf_types.reply_claim_accept or \
               condor_msg.type == condor_wf_types.reply_claim_reject:
-            child = threading.Thread(target=handle_reply_fetch, args=(condor_msg, status_queue, share_data, debug_logging))
+            child = threading.Thread(target=handle_reply_fetch, args=(condor_msg, sqs_connection, work_queue, status_queue, share_data, debug_logging))
          elif condor_msg.type == condor_wf_types.prepare_job:
-            child = threading.Thread(target=handle_prepare_job, args=(sock, condor_msg, s3_connection, share_data, debug_logging))
+            child = threading.Thread(target=handle_prepare_job, args=(sock, condor_msg, s3_connection, sqs_connection, work_queue, share_data, debug_logging))
          elif condor_msg.type == condor_wf_types.update_job_status:
             child = threading.Thread(target=handle_update_job_status, args=(condor_msg, status_queue, share_data, debug_logging))
          elif condor_msg.type == condor_wf_types.exit_exit or \
               condor_msg.type == condor_wf_types.exit_remove or \
               condor_msg.type == condor_wf_types.exit_hold or \
               condor_msg.type == condor_wf_types.exit_evict:
-            child = threading.Thread(target=handle_exit, args=(sock, condor_msg, s3_connection, work_queue, status_queue, share_data, debug_logging))
+            child = threading.Thread(target=handle_exit, args=(sock, condor_msg, s3_connection, sqs_connection, work_queue, status_queue, share_data, debug_logging))
          else:
             syslog.syslog(syslog.LOG_WARNING, 'Received unknown request: %d' % condor_msg.type)
             continue
@@ -992,7 +992,7 @@ def main(argv=None):
       # Reset visibility timer on messages being processed
       if share_data != None:
          for item in share_data.values():
-            item.SQS_msg.change_visibility(1)
+            sqs_connection.change_message_visibility(work_queue, item.SQS_msg.receipt_handle, 1)
             
       return(SUCCESS)
 
@@ -1005,7 +1005,7 @@ def main(argv=None):
       # Reset visibility timer on messages being processed
       if share_data != None:
          for item in share_data.values():
-            item.SQS_msg.change_visibility(1)
+            sqs_connection.change_message_visibility(work_queue, item.SQS_msg.receipt_handle, 1)
 
       return(FAILURE)
 
