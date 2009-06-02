@@ -300,7 +300,7 @@ def main(argv=None):
       sys.stderr.write('Error: Unable to connect to S3: %s, %s\n' % (error.reason, error.body))
       return(FAILURE)
       
-   s3_bucket_name = '%s-%s' % (str(aws_key_val), bucket_id)
+   s3_bucket_name = '%s-%s' % (str(aws_key_val).lower(), bucket_id.lower())
    try:
       s3_bucket = s3_con.create_bucket(s3_bucket_name)
    except BotoServerError, error:
@@ -376,7 +376,6 @@ def main(argv=None):
             syslog.syslog(syslog.LOG_ERR, 'Error: Unable to remove job data from S3: %s, %s' % (error.reason, error.body))
             sys.stderr.write('Error: Unable to remove job data from S3: %s, %s\n' % (error.reason, error.body))
       return(FAILURE)
-   grid_classad += 'SQSMessageId = "' + str(message.id) + '"\n'
 
    # Print the Converted Amazon job to stdout
    print grid_classad

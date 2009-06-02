@@ -1,4 +1,4 @@
-%define rel 10
+%define rel 11pre
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
@@ -15,7 +15,7 @@ Requires: condor >= 7.0.2-4
 Requires: condor-job-hooks
 Requires: condor-job-hooks-common
 Requires: condor-ec2-enhanced-hooks-common
-Requires: python-boto >= 1.0a
+Requires: python-boto >= 1.7a
 Requires: openssl
 
 Requires(post):/sbin/chkconfig
