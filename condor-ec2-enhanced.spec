@@ -1,4 +1,4 @@
-%define rel 11pre
+%define rel 11
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
@@ -68,6 +68,10 @@ fi
 %_sbindir/caroniad
 
 %changelog
+* Tue Jun  2 2009  <rrati@redhat> - 1.0-11
+- Remove RLocks and added better error handling to reduce deadlock potential
+- Changes to work with boto 1.7a
+
 * Fri Feb 13 2009  <rrati@redhat> - 1.0-10
 - Rebuild bump
 

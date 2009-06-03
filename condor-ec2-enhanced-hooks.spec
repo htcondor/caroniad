@@ -69,6 +69,7 @@ touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
 %changelog
 * Fri Feb 27 2009  <rrati@redhat> - 1.0-14
 - Update docs
+- Changes to work with boto 1.7a
 
 * Fri Feb 13 2009  <rrati@redhat> - 1.0-13
 - Rebuild bump

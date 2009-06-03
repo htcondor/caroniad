@@ -283,7 +283,7 @@ def handle_get_work(req_socket, reply, sqs_con, queue, known_items, log):
          req_socket.send(pickle.dumps(reply, 2))
          close_socket(req_socket)
          known_items.unlock()
-         if log == True
+         if log == True:
             print '%s: Released global message lock for slot check %s' % (func_name, str(slot))
          return(SUCCESS)
       known_items.unlock()
@@ -472,7 +472,7 @@ def handle_reply_fetch(msg, sqs_con, work_q, status_q, known_items, log):
          try:
             response = pickle.loads(saved_work.SQS_msg.get_body())
          except:
-            saved_work.SQS_msg.change_visibility(5)
+            sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
             saved_work.unlock()
             raise general_exception(syslog.LOG_ERR, '%s: Failed to create response message for id "%s"' % (func_name, message_id))
          response.class_ad = result_ad
@@ -535,8 +535,7 @@ def handle_prepare_job(req_socket, reply, s3_storage, sqs_con, queue, known_item
          # in the exit message.  This is bad and shouldn't happen.
          known_items.unlock()
          if log == True:
-            print '%s: Released global message lock for %s' % (func_name, str(m
-essage_id))
+            print '%s: Released global message lock for %s' % (func_name, str(message_id))
          raise general_exception(syslog.LOG_ERR, '%s: Unable to find stored SQS message with SQSMessageId %s' % (func_name, str(message_id)))
       else:
          if log == True:
@@ -553,7 +552,7 @@ essage_id))
          try:
             msg = pickle.loads(saved_work.SQS_msg.get_body())
          except:
-            saved_work.SQS_msg.change_visibility(5)
+            sqs_con.change_message_visibility(queue, saved_work.SQS_msg.receipt_handle, 5)
             known_items.remove_work(message_id)
             saved_work.unlock()
             raise general_exception(syslog.LOG_ERR, '%s: Failed to retrieve job details for id "%s"' % (func_name, message_id))
@@ -614,8 +613,7 @@ def handle_update_job_status(msg, queue, known_items, log):
          message_id = message_ids[0].rstrip().lstrip()
 
       if log == True:
-         print '%s: Acquiring global message lock for %s' % (func_name, str(mes
-sage_id))
+         print '%s: Acquiring global message lock for %s' % (func_name, str(message_id))
       known_items.lock()
       if log == True:
          print '%s: Acquired global message lock for %s' % (func_name, str(message_id))
@@ -750,7 +748,7 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
             # results message.
             results = pickle.loads(saved_work.SQS_msg.get_body())
          except:
-            saved_work.SQS_msg.change_visibility(5)
+            sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
             saved_work.unlock()
             syslog.syslog(syslog.LOG_WARNING, '%s: Unable to retrive job information for id %s' % (func_name, message_id))
 
@@ -771,13 +769,13 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
                results.s3_key = s3_key.key
                msg.data += 'S3KeyID = "%s"\n' % s3_key.key
          except:
-            saved_work.SQS_msg.change_visibility(5)
+            sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
             saved_work.unlock()
             syslog.syslog(syslog.LOG_WARNING, '%s: Unable to create storage bucket in S3 for id %s' % (func_name, message_id))
 
          # Create the list of files to put into the results archive
          if os.path.exists(work_cwd) == False:
-            saved_work.SQS_msg.change_visibility(5)
+            sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
             saved_work.unlock()
             raise general_exception(syslog.LOG_ERR, '%s: Unable to change to exe dir "%s" for id "%s"' % (func_name, work_cwd, str(message_id)))
 
@@ -804,7 +802,7 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
                file_list = os.listdir(".")
          except:
             saved_work.unlock()
-            saved_work.SQS_msg.change_visibility(5)
+            sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
             raise general_exception(syslog.LOG_ERR, '%s: Failed to create list of files for results archive for id "%s"' % (func_name, str(message_id)))
 
          # Archive all the important files
@@ -813,7 +811,7 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
             results_file = tarfile.open(results_filename, 'w:gz')
          except:
             saved_work.unlock()
-            saved_work.SQS_msg.change_visibility(5)
+            sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
             raise general_exception(syslog.LOG_ERR, '%s: Failed to open archive file for writing for id "%s"' % (func_name, str(message_id)))
 
          for file in file_list:
@@ -828,7 +826,7 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
                      results_file.add(os.path.basename(file.rstrip()))
                   except:
                      saved_work.unlock()
-                     saved_work.SQS_msg.change_visibility(5)
+                     sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
                      raise general_exception(syslog.LOG_ERR, '%s: Failed to write file "%s" to archive for id "%s"' % (func_name, file, str(message_id)))
                   os.chdir(work_cwd)
                else:
@@ -837,7 +835,7 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
             results_file.close()
          except:
             saved_work.unlock()
-            saved_work.SQS_msg.change_visibility(5)
+            sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
             raise general_exception(syslog.LOG_ERR, '%s: Failed to write archive to disk for id "%s"' % (func_name, str(message_id)))
 
          if msg.type == condor_wf_types.exit_exit:
@@ -928,7 +926,7 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
                print '%s: Not normal exit: %s' % (func_name, str(msg.type))
 
             # Reset the visibility timer so it can be read again quickly.
-            saved_work.SQS_msg.change_visibility(5)
+            sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
             saved_work.unlock()
 
       # Send acknowledgement to the originator that exit work is complete
