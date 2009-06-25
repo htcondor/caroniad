@@ -44,7 +44,6 @@ Common functions and utilities used by MRG condor job hooks.
 %install
 mkdir -p %{buildroot}/%_libexecdir/condor/hooks
 mkdir -p %{buildroot}/%{python_sitelib}/ec2enhanced
-mkdir -p %{buildroot}/%_sysconfdir/opt/grid
 mkdir -p %{_builddir}/%{name}-%{version}/example
 cp -f hook*.py %{buildroot}/%_libexecdir/condor/hooks
 cp -f functions.py %{buildroot}/%{python_sitelib}/ec2enhanced

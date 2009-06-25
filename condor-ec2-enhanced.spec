@@ -39,14 +39,18 @@ feature.
 
 %install
 mkdir -p %{buildroot}%{_sbindir}
-mkdir -p %{buildroot}/%{_sysconfdir}/opt/grid
+mkdir -p %{buildroot}/%{_sysconfdir}/condor
 mkdir -p %{buildroot}/%{_initrddir}
 cp -f caroniad %{buildroot}/%_sbindir
-cp -f config/caroniad.conf %{buildroot}/%{_sysconfdir}/opt/grid
+cp -f config/caroniad.conf %{buildroot}/%{_sysconfdir}/condor
 cp -f config/condor-ec2-enhanced.init %{buildroot}/%{_initrddir}/condor-ec2-enhanced
 
 %post
 /sbin/chkconfig --add condor-ec2-enhanced
+if [[ -f /etc/opt/grid/caroniad.conf ]]; then
+   mv -f /etc/opt/grid/caroniad.conf /etc/condor
+   rmdir --ignore-fail-on-non-empty -p /etc/opt/grid
+fi
 
 %preun
 if [ $1 = 0 ]; then
@@ -62,7 +66,7 @@ fi
 %files
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt
-%config(noreplace) %_sysconfdir/opt/grid/caroniad.conf
+%config(noreplace) %_sysconfdir/condor/caroniad.conf
 %defattr(0755,root,root,-)
 %_initrddir/condor-ec2-enhanced
 %_sbindir/caroniad

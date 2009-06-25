@@ -8,7 +8,7 @@
 #              Amazon's Web Services for use with condor's EC2 Enhanced
 #              feature.
 # processname: caroniad
-# config: /etc/opt/grid/caroniad.conf
+# config: /etc/condor/caroniad.conf
 # pidfile: /var/run/caroniad.pid
 
 ### BEGIN INIT INFO

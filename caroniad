@@ -1020,7 +1020,7 @@ def main(argv=None):
       queue_name = user_data[2].rstrip()
 
       try:
-         sqs_config = read_config_file('/etc/opt/grid/caroniad.conf', 'Daemon')
+         sqs_config = read_config_file('/etc/condor/caroniad.conf', 'Daemon')
       except config_err, error:
          raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
 

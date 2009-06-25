@@ -135,7 +135,7 @@ job's submit file (+RSAPublicKey).
 
 Next the caroniad daemon must be configured by editing:
 
-/etc/opt/grid/caroniad.conf
+/etc/condor/caroniad.conf
 
 ip - The IP address caroniad should listen on for communication with Condor.
 port - The port caroniad should listen on for communication with Condor.
@@ -148,7 +148,7 @@ lease_check_interval - How often to check for jobs with possible issues.
 
 Then edit the hook configuration file to communicate with caroniad:
 
-/etc/opt/grid/job-hooks.conf
+/etc/condor/job-hooks.conf
 
 ip - The IP address the hooks should use to communicate with caroniad
 port - The port the hooks should use to communicate with caroniad
