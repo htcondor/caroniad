@@ -1,4 +1,5 @@
 %define rel 12
+%{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
@@ -8,6 +9,7 @@ License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
 Source0: %{name}-%{version}-%{rel}.tar.gz
+Patch0: chkconfig_off.patch
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
 Requires: python >= 2.4
@@ -36,6 +38,9 @@ feature.
 
 %prep
 %setup -q
+%if 0%{?is_fedora} != 0
+%patch0 -p1
+%endif
 
 %install
 mkdir -p %{buildroot}%{_sbindir}
