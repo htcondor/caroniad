@@ -1,4 +1,4 @@
-%define rel 12
+%define rel 13
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
 
 Summary: EC2 Enhanced
@@ -77,6 +77,9 @@ fi
 %_sbindir/caroniad
 
 %changelog
+* Wed Jul 22 2009  <rrati@redhat> - 1.0-13
+- Added Fedora packaging support
+
 * Wed Jul 22 2009  <rrati@redhat> - 1.0-12
 - Moved configuration files to /etc/condor
 
