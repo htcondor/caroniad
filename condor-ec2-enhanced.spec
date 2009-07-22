@@ -1,4 +1,4 @@
-%define rel 11
+%define rel 12
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
@@ -72,6 +72,9 @@ fi
 %_sbindir/caroniad
 
 %changelog
+* Wed Jul 22 2009  <rrati@redhat> - 1.0-12
+- Moved configuration files to /etc/condor
+
 * Tue Jun  2 2009  <rrati@redhat> - 1.0-11
 - Remove RLocks and added better error handling to reduce deadlock potential
 - Changes to work with boto 1.7a
