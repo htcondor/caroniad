@@ -1,5 +1,5 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 15
+%define rel 16
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
@@ -17,7 +17,7 @@ BuildArch: noarch
 Requires: python >= 2.3
 Requires: condor >= 7.2.0-4
 Requires: condor-job-hooks-common >= 1.0-4
-Requires: condor-ec2-enhanced-hooks-common
+Requires: condor-%{name}-common
 Requires: python-boto >= 1.7a
 Requires: openssl
 
@@ -32,13 +32,14 @@ a Condor EC2 job and monitor the state of that job.  This should be installed
 on condor nodes that will submitting work and wish to use the EC2 Enhanced
 feature.
 
-%package common
+%package -n python-%{name}-common
 Summary: Common functions/utilities for condor job hooks
 Group: Applications/System
 BuildRequires: python-devel
 Requires: python >= 2.3
+Obsoletes: condor-ec2-enhanced-common
 
-%description common
+%description -n python-%{name}-common
 Common functions and utilities used by MRG condor job hooks.
 
 %prep
@@ -68,13 +69,18 @@ rm -rf %{buildroot}
 %_libexecdir/condor/hooks/hook_cleanup.py*
 %_libexecdir/condor/hooks/hook_retrieve_status.py*
 
-%files common
+%files -n python-%{name}-common
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt
 %{python_sitelib}/ec2enhanced/functions.py*
 %{python_sitelib}/ec2enhanced/__init__.py*
 
 %changelog
+* Mon Jul 27 2009  <rrati@redhat> - 1.0-16
+- Renamed condor-ec2-enhanced-hooks-common to
+  python-condor-ec2-enhanced-hooks to conform to packaging guidelines
+  since the package installs in python sitelib.
+
 * Mon Jul 27 2009  <rrati@redhat> - 1.0-15
 - Fixed rpmlint/packaging issues
 

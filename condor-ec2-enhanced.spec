@@ -1,5 +1,5 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 14
+%define rel 15
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
@@ -19,7 +19,7 @@ Requires: python >= 2.4
 Requires: condor >= 7.0.2-4
 Requires: condor-job-hooks
 Requires: condor-job-hooks-common
-Requires: condor-ec2-enhanced-hooks-common
+Requires: python-condor-ec2-enhanced-hooks-common
 Requires: python-boto >= 1.7a
 Requires: openssl
 
@@ -88,6 +88,9 @@ fi
 %_sbindir/caroniad
 
 %changelog
+* Mon Jul 27 2009  <rrati@redhat> - 1.0-15
+- Updated dependencies to match hooks-common rename
+
 * Mon Jul 27 2009  <rrati@redhat> - 1.0-14
 - Fixed rpmlint/packaging issues
 
