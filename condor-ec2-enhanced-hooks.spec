@@ -1,5 +1,5 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 14
+%define rel 15
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
@@ -8,6 +8,9 @@ Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
+# This is a Red Hat maintained package which is specific to
+# our distribution.  Thus the source is only available from
+# within this srpm.
 Source0: %{name}-%{version}-%{rel}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
@@ -41,7 +44,10 @@ Common functions and utilities used by MRG condor job hooks.
 %prep
 %setup -q
 
+%build
+
 %install
+rm -rf %{buildroot}
 mkdir -p %{buildroot}/%_libexecdir/condor/hooks
 mkdir -p %{buildroot}/%{python_sitelib}/ec2enhanced
 mkdir -p %{_builddir}/%{name}-%{version}/example
@@ -49,6 +55,9 @@ cp -f hook*.py %{buildroot}/%_libexecdir/condor/hooks
 cp -f functions.py %{buildroot}/%{python_sitelib}/ec2enhanced
 cp -f config/condor_config.example %{_builddir}/%{name}-%{version}/example
 touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
+
+%clean
+rm -rf %{buildroot}
 
 %files
 %defattr(-,root,root,-)
@@ -66,6 +75,9 @@ touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
 %{python_sitelib}/ec2enhanced/__init__.py*
 
 %changelog
+* Mon Jul 27 2009  <rrati@redhat> - 1.0-15
+- Fixed rpmlint/packaging issues
+
 * Fri Feb 27 2009  <rrati@redhat> - 1.0-14
 - Update docs
 - Changes to work with boto 1.7a

@@ -1,5 +1,5 @@
-%define rel 13
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
+%define rel 14
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
@@ -8,6 +8,9 @@ Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
+# This is a Red Hat maintained package which is specific to
+# our distribution.  Thus the source is only available from
+# within this srpm.
 Source0: %{name}-%{version}-%{rel}.tar.gz
 Patch0: chkconfig_off.patch
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
@@ -42,7 +45,10 @@ feature.
 %patch0 -p1
 %endif
 
+%build
+
 %install
+rm -rf %{buildroot}
 mkdir -p %{buildroot}%{_sbindir}
 mkdir -p %{buildroot}/%{_sysconfdir}/condor
 mkdir -p %{buildroot}/%{_initrddir}
@@ -50,12 +56,17 @@ cp -f caroniad %{buildroot}/%_sbindir
 cp -f config/caroniad.conf %{buildroot}/%{_sysconfdir}/condor
 cp -f config/condor-ec2-enhanced.init %{buildroot}/%{_initrddir}/condor-ec2-enhanced
 
+%clean
+rm -rf %{buildroot}
+
 %post
 /sbin/chkconfig --add condor-ec2-enhanced
+%if 0%{?is_fedora} == 0
 if [[ -f /etc/opt/grid/caroniad.conf ]]; then
    mv -f /etc/opt/grid/caroniad.conf /etc/condor
    rmdir --ignore-fail-on-non-empty -p /etc/opt/grid
 fi
+%endif
 
 %preun
 if [ $1 = 0 ]; then
@@ -77,6 +88,9 @@ fi
 %_sbindir/caroniad
 
 %changelog
+* Mon Jul 27 2009  <rrati@redhat> - 1.0-14
+- Fixed rpmlint/packaging issues
+
 * Wed Jul 22 2009  <rrati@redhat> - 1.0-13
 - Added Fedora packaging support
 
