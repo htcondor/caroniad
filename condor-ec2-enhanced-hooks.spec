@@ -1,5 +1,5 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 17
+%define rel 18
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
@@ -17,7 +17,7 @@ BuildArch: noarch
 Requires: python >= 2.3
 Requires: condor >= 7.2.0-4
 Requires: python-condor-job-hooks-common >= 1.0-4
-Requires: python-condor-%{name}-common
+Requires: python-%{name}-common
 Requires: python-boto >= 1.7a
 Requires: openssl
 
