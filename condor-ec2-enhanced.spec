@@ -12,7 +12,6 @@ URL: http://www.redhat.com/mrg
 # our distribution.  Thus the source is only available from
 # within this srpm.
 Source0: %{name}-%{version}-%{rel}.tar.gz
-Patch0: chkconfig_off.patch
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
 Requires: python >= 2.4
@@ -22,11 +21,7 @@ Requires: python-condor-job-hooks-common
 Requires: python-condor-ec2-enhanced-hooks-common
 Requires: python-boto >= 1.7a
 Requires: openssl
-
-Requires(post):/sbin/chkconfig
-Requires(preun):/sbin/chkconfig
-Requires(preun):/sbin/service
-Requires(postun):/sbin/service
+Conflicts: condor-low-latency
 
 %description
 The EC2 Enhanced feature allows for near seamless translation of Condor jobs
@@ -41,9 +36,6 @@ feature.
 
 %prep
 %setup -q
-%if 0%{?is_fedora} != 0
-%patch0 -p1
-%endif
 
 %build
 
@@ -51,40 +43,26 @@ feature.
 rm -rf %{buildroot}
 mkdir -p %{buildroot}%{_sbindir}
 mkdir -p %{buildroot}/%{_sysconfdir}/condor
-mkdir -p %{buildroot}/%{_initrddir}
 cp -f caroniad %{buildroot}/%_sbindir
 cp -f config/caroniad.conf %{buildroot}/%{_sysconfdir}/condor
-cp -f config/condor-ec2-enhanced.init %{buildroot}/%{_initrddir}/condor-ec2-enhanced
 
 %clean
 rm -rf %{buildroot}
 
 %post
-/sbin/chkconfig --add condor-ec2-enhanced
 %if 0%{?is_fedora} == 0
 if [[ -f /etc/opt/grid/caroniad.conf ]]; then
    mv -f /etc/opt/grid/caroniad.conf /etc/condor
    rmdir --ignore-fail-on-non-empty -p /etc/opt/grid
 fi
 %endif
-
-%preun
-if [ $1 = 0 ]; then
-  /sbin/service condor-ec2-enhanced stop >/dev/null 2>&1 || :
-  /sbin/chkconfig --del condor-ec2-enhanced
-fi
-
-%postun
-if [ "$1" -ge "1" ]; then
-  /sbin/service condor-ec2-enhanced condrestart >/dev/null 2>&1 || :
-fi
+exit 0
 
 %files
 %defattr(-,root,root,-)
-%doc LICENSE-2.0.txt
+%doc LICENSE-2.0.txt INSTALL
 %config(noreplace) %_sysconfdir/condor/caroniad.conf
 %defattr(0755,root,root,-)
-%_initrddir/condor-ec2-enhanced
 %_sbindir/caroniad
 
 %changelog

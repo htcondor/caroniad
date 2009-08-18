@@ -945,6 +945,7 @@ def main(argv=None):
    pidfile = ''
    daemon_mode = 0
    share_data = None
+   conf_file = '/etc/condor/caroniad.conf'
 
    if argv is None:
       argv = sys.argv
@@ -1020,9 +1021,14 @@ def main(argv=None):
       queue_name = user_data[2].rstrip()
 
       try:
-         sqs_config = read_config_file('/etc/condor/caroniad.conf', 'Daemon')
+         sqs_config = read_condor_config('EC2E_DAEMON', ['IP', 'PORT', 'QUEUED_CONNECTIONS', 'LEASE_TIME', 'LEASE_CHECK_INTERVAL'])
       except config_err, error:
-         raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
+         syslog.syslog(syslog.LOG_INFO, *(error.msg))
+         syslog.syslog(syslog.LOG_INFO, 'Attempting to retrieve config from %s' % conf_file)
+         try:
+            sqs_config = read_config_file(conf_file, 'Daemon')
+         except config_err, error:
+            raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
 
       # Create a container to share data between threads
       share_data = global_data()

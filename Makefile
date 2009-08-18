@@ -42,7 +42,8 @@ SOURCES/${EC2EHOOKS_SOURCE}: hooks/functions.py hooks/hook_cleanup.py \
 	mkdir ${EC2EHOOKS_DIR}
 	mkdir ${EC2EHOOKS_DIR}/config
 	cp -f hooks/* ${EC2EHOOKS_DIR}
-	cp -f LICENSE-2.0.txt INSTALL ${EC2EHOOKS_DIR}
+	cp -f LICENSE-2.0.txt ${EC2EHOOKS_DIR}
+	cp -f INSTALL.hooks ${EC2EHOOKS_DIR}/INSTALL
 	cp -f config/condor_config.example ${EC2EHOOKS_DIR}/config
 	tar -zcf ${EC2EHOOKS_SOURCE} ${EC2EHOOKS_DIR}
 	mv "${EC2EHOOKS_SOURCE}" SOURCES
@@ -54,7 +55,7 @@ SOURCES/${EC2E_SOURCE}: caroniad config/caroniad.conf config/condor-ec2-enhanced
 	mkdir ${EC2E_DIR}/config
 	cp -f caroniad ${EC2E_DIR}
 	cp -f config/caroniad.conf config/condor-ec2-enhanced.init ${EC2E_DIR}/config
-	cp -f LICENSE-2.0.txt ${EC2E_DIR}
+	cp -f LICENSE-2.0.txt INSTALL ${EC2E_DIR}
 	tar -zcf ${EC2E_SOURCE} ${EC2E_DIR}
 	mv "${EC2E_SOURCE}" SOURCES
 	cp -f config/chkconfig_off.patch SOURCES

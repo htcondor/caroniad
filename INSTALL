@@ -1,115 +1,7 @@
-Job Router Hooks
+Configuring the EC2E AMI:
 
-Job Router Hooks allow for an alternate transformation and/or monitoring engine
-for the Job Router.  Routing is still controlled by the Job Router but if the
-Job Router Hooks are configured, then these hooks will be used to transform
-and monitor the job instead of Condor's internal engine.
-
-Job Router Hooks are similiar in concept to Job Hooks, but are limited
-in their scope to just the Job Router.  As with Job Hooks, a hook is an
-external program or script invoked by Condor's Job Router at various points
-during the lifecylce of a routed job.
-
-The following sections describe how these hooks are used by the Job Router,
-what hooks are invoked by Condor at various stages of the job's life, how
-to configure Condor to use Job Router Hooks, and how to write your own hooks.
-
-Overview of Job Router Hooks
-
-The Job Router Hooks allow for replacement of the tranformation engine used
-by Condor for routing a job.  Since the external transformation engine isn't
-controlled by Condor, additional hooks provide a means to update the job's
-status in Condor and clean up upon exit or failure cases.  This allows a job
-to be transformed to just about any other type of job that Condor supports, as
-well as to use execution nodes not normally available to Condor.
-
-It is important to note that if the Job Router Hooks are configured 
-then Condor will not ignore a failure in any hook execution.  If a hook
-is configured then Condor assumes it is required to execute and will not
-continue by falling back to a part of its internal engine.  For example,
-if there is a problem transforming the job using the hooks, Condor will
-not fall back on its internal transformation engine to process the job.
-
-Hooks Invoked by the Job Router
-
-There are 4 hooks that the Job Router can be configured to use.  Each
-hook will be described below along with data passed to the hook and expected
-output.  Again, all hooks must exit successfully.
-
-Hook: Translate
-
-HOOK_TRANSLATE is invoked when the Job Router has determined that a job
-meets the definition for a route.  This hook is responsible for doing the
-transformation of the job and configuring any resources that are external to
-Condor if applicable.
-
-Arguments: None.
-Standard Input: The first line will be the route that the job matched as
-defined in Condor's configuration files followed by the job ClassAd (separated
-by the string '------' and a new line).
-Expected Output: The transformed job.
-Exit Status: 0 for success, any non-zero value on failure.
-
-Hook: Update Job Info
-
-HOOK_UPDATE_JOB_INFO is invoked to provide status on the specified routed job
-when the Job Router polls the status of routed jobs (JOB_ROUTER_POLLING_PERIOD).
-
-Arguments: None.
-Standard Input: The routed job ClassAd that is to be updated.
-Expected Output: The job attributes to be updated in the routed job, or nothing
-if no update.  Note: To prevent clashing with condor's management of job
-attributes, only attributes that are not managed by condor should be output
-from this hook.
-Exit Status: 0 for success, any non-zero value on failure.
-
-Hook: Job Finalize
-
-HOOK_JOB_FINALIZE is invoked when the Job Router has found that the job has
-completed.  Any output from the hook is treated as an update to the source
-job.
-
-Arguments: None.
-Standard Input: The source job ClassAd follow by the routed job Classad that
-completed (separated by the string '------' and a new line).
-Expected Output: An updated source job ClassAd, or nothing if no update.
-Exit Status: 0 for success, any non-zero value on failure.
-
-Hook: Job Cleanup
-
-HOOK_JOB_CLEANUP is invoked when the Job Router finishes managing the job.
-This hook will be invoked regardless of whether the job completes successfully
-or not, and must exit successfully.
-
-Arguments: None.
-Standard Input: The job ClassAd that the Job Router is done managing.
-Expected Output: None.
-Exit Status: 0 for success, any non-zero value on failure.
-
-Configuring Condor to Use Job Router Hooks
-
-The following configuration defines all 4 Job Router hooks.
-
-# Job Router Hooks
-JOB_ROUTER_HOOK_TRANSLATE_JOB = $(LIBEXEC)/hooks/hook_translate.py
-JOB_ROUTER_HOOK_UPDATE_JOB_INFO = $(LIBEXEC)/hooks/hook_retrieve_status.py
-JOB_ROUTER_HOOK_JOB_EXIT = $(LIBEXEC)/hooks/hook_job_finalize.py
-JOB_ROUTER_HOOK_JOB_CLEANUP = $(LIBEXEC)/hooks/hook_cleanup.py
-
-
-
-Configuring the EC2 Enhanced Feature
-
-On the submit machine the ec2-enhanced-hooks RPM will need to be installed
-and condor figured to use the job router hooks installed.  A sample
-configuration file for the submit machine(s) that will enable the EC2 Enhanced
-Feature and allow routing for all EC2 AMI types is located at:
-
-/usr/share/doc/ec2-enhanced-hooks-1.0/example/condor_config.example
-
-
-On the EC2 AMI, the ec2-enhanced RPM will need to be installed, which will
-depend on Condor.  Condor needs to be configured to enable job hooks.  The
+On the EC2 AMI the ec2-enhanced RPM will need to be installed which will
+depend on Condor, and Condor needs to be configured to use job hooks.  The
 following example configures the Job Hooks for EC2 Enhanced with a fetch
 interval of 10 seconds, and an update interval of 30 seconds:
 
@@ -128,108 +20,44 @@ STARTER_JOB_HOOK_KEYWORD = EC2ENHANCED
 FetchWorkDelay = 10
 STARTER_UPDATE_INTERVAL = 30
 
+EC2E_DAEMON = $(SBIN)/caroniad
+DAEMON_LIST = $(DAEMON_LIST), EC2E_DAEMON
+
 An RSA private key needs to be stored in '/root/.ec2/rsa_key" on the AMI.
 This key must be able to decrypt data encrypted with the RSA public key
 provided in a route's configuration (set_rsapublickey) or in the
 job's submit file (+RSAPublicKey).
 
-Next the caroniad daemon must be configured by editing:
+Next the caroniad daemon must be configured.  The caroniad daemon will
+first look for its configuration in condor's configuration files.  The
+following parameters can be placed in a condor configuration file to
+configure caroniad:
 
-/etc/condor/caroniad.conf
+EC2E_DAEMON_IP:
+   Type: IP Address
+   Desc: The IP address of the interface carod use for connections
 
-ip - The IP address caroniad should listen on for communication with Condor.
-port - The port caroniad should listen on for communication with Condor.
-queued_connections - Number of outstanding connections.
-lease_time - Amount of time a job can run without an update of some kind.  No
-             update inferes there was a problem and the job will be released
-             and/or retried.  This value must be larger than what is set for
-             STARTER_UPDATE_INTERVAL.
-lease_check_interval - How often to check for jobs with possible issues.
+EC2E_DAEMON_PORT:
+   Type: Integer
+   Desc: The port carod should use to listen for connections
 
-Then edit the hook configuration file to communicate with caroniad:
+EC2E_DAEMON_QUEUED_CONNECTIONS:
+   Type: Integer
+   Desc: The number of allowed outstanding connections
 
-/etc/condor/job-hooks.conf
+EC2E_DAEMON_LEASE_TIME:
+   Type: Integer
+   Desc: The maximum amount of time a job is allowed to run without providing
+         an update
 
-ip - The IP address the hooks should use to communicate with caroniad
-port - The port the hooks should use to communicate with caroniad
+EC2E_DAEMON_LEASE_CHECK_INTERVAL:
+   Type: Integer
+   Desc: How often to check for lease expiration
 
-Package the AMI and configure the set_amazonamiid to the AMI ID once registered
-in EC2 for the route that the AMI should be used.
+If the configuration is not found in condor's configuration files, then
+caroniad will look in /etc/condor/caroniad.conf.
 
+Then edit the job hook configuration file to communicate with caroniad.
+See /usr/share/doc/condor-job-hooks-1.0/INSTALL for details.
 
-Using EC2 Enhanced
-
-A job that wants to use the EC2 Enhanced feature looks like any other vanilla
-universe job, however a few keys will need to be added to the submit file.
-Using the entries from the example condor_configuration file, the following
-submit file will cause the job to be routed to the Amazon Small route using
-the administrator defined credentials:
-
-universe = vanilla
-executable = /bin/date
-output = date.out
-log = ulog
-requirements = Arch == "INTEL" 
-should_transfer_files = yes
-when_to_transfer_output = on_exit
-transfer_executable = false 
-+WantAWS = True
-+WantArch = "INTEL" 
-+WantCPUs = 1
-+EC2RunAttempts = 0
-queue
-
-It is important to note that it is likely that the Requirements attribute
-for the job will need to be set to match the hardware of the AMI the job will
-run on.  If the submit machine is X86_64 and the requirements are not
-specified, then the above job will not execute because the Amazon Small AMI
-type is 32-bit, not 64-bit.
-
-The following fields can be defined, where applicable, to aid in routing the
-job to the proper AMI.  If only WantAWS is defined, then the job will be routed
-to the small AMI type.
-
-WantAWS 
-    Values: True/False.
-
-    Designates that the job wants to use EC2 for execution.  Defaults to False.
-
-WantArch
-    Values: "INTEL"/"X86_64"
-
-    Designates the architecture desired for the job.  Defaults to INTEL.
-
-WantCpus
-    Values: Integer
-
-    Designates the number of CPUs desired for the job.
-
-WantMemory
-    Values: Float
-
-    Designates the amount of RAM desired for the job.  Value is in Gigabytes,
-    so 1 == 1 Gigabyte.
-
-WantDisk
-    Values: Integer
-
-    Designates the amount of Disk space desired for the job.  Value is in in
-    Gigabytes, so 100 == 100 Gigabytes of disk space.
-
-EC2RunAttempts
-    Values: Integer
-
-    The number of times the job has been attempted to be run in the EC2 AMI.
-
-The submit file can provide user credentials for accessing EC2 if the site
-administrator has not configured credientials for that submit machine by
-adding the similar entries to the submit file:
-
-+AmazonAccessKey = "<path>/access_key"
-+AmazonSecretKey = "<path>/secret_access_key"
-+AmazonPublicKey = "<path>/cert.pem"
-+AmazonPrivateKey = "<path>/pk.pem"
-+RSAPublicKey = "<path>/rsa_key.pub"
-
-These credentials will only be used if the submit machine does NOT have
-credentials defined in condor_config for the route that the job will use.
+Once the configuration is complete, restart condor.
