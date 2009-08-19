@@ -1,5 +1,5 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 18
+%define rel 19
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
@@ -37,7 +37,7 @@ Summary: Common functions/utilities for condor job hooks
 Group: Applications/System
 BuildRequires: python-devel
 Requires: python >= 2.3
-Obsoletes: condor-ec2-enhanced-common
+Obsoletes: condor-ec2-enhanced-hooks-common
 
 %description -n python-%{name}-common
 Common functions and utilities used by MRG condor job hooks.
@@ -76,6 +76,16 @@ rm -rf %{buildroot}
 %{python_sitelib}/ec2enhanced/__init__.py*
 
 %changelog
+* Tue Aug 18 2009  <rrati@redhat> - 1.0-19
+- Split the documentation into two files, one for the AMI and one for
+  the submit machine
+- Fixed obsolete issue with common package
+- SQS/S3 queues/buckets no longer use GlobalJobId because they can be too
+  long for AWS.  Instead, ClusterId, ProcId, and QDate is used.
+
+* Mon Jul 27 2009  <rrati@redhat> - 1.0-18
+- Fixed dependency issue
+
 * Mon Jul 27 2009  <rrati@redhat> - 1.0-17
 - Fixed missed dependency renames
 

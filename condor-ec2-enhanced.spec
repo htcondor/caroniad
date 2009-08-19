@@ -1,5 +1,5 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 16
+%define rel 17
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
@@ -66,6 +66,14 @@ exit 0
 %_sbindir/caroniad
 
 %changelog
+* Tue Aug 18 2009  <rrati@redhat> - 1.0-17
+- caroniad checks condor_config for its configuration before looking
+  in configuration files
+- Removed the init script as the daemon is controlled by condor now
+- Split the documentation into two files, one for the AMI and one for
+  the submit machine
+- Added conflict with condor-low-latency
+
 * Mon Jul 27 2009  <rrati@redhat> - 1.0-16
 - Fixed missed dependency renames
 
