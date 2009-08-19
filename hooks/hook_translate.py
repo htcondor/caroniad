@@ -57,9 +57,11 @@ def main(argv=None):
    aws_public_key = ''
    aws_private_key = ''
    bucket_id = ''
-   queue_name = ''
+#   queue_name = ''
    rsa_public_key = ''
-   global_id = ''
+   proc_id = ''
+   cluster_id = ''
+   qdate = ''
    delay = ''
    s3_key = ''
    route_name = ''
@@ -93,9 +95,9 @@ def main(argv=None):
          if attribute.lower() == 'set_amazons3bucketname':
             bucket_id = value
             continue
-         if attribute.lower() == 'set_amazonsqsqueuename':
-            queue_name = value
-            continue
+#         if attribute.lower() == 'set_amazonsqsqueuename':
+#            queue_name = value
+#            continue
          if attribute.lower() == 'set_rsapublickey':
             rsa_public_key = value
             continue
@@ -140,8 +142,15 @@ def main(argv=None):
             if rsa_public_key == '':
                user_rsa_public_key = value
             continue
-         if attribute.lower() == 'globaljobid':
-            global_id = value.replace('#', '').replace('@', '').replace('.', '')
+         if attribute.lower() == 'clusterid':
+            cluster_id = value
+            continue
+         if attribute.lower() == 'procid':
+            proc_id = value
+            continue
+         if attribute.lower() == 'qdate':
+            qdate = value
+            continue
          if attribute.lower() in skip_attribs:
             continue
          sqs_data.class_ad += str(line)
@@ -176,7 +185,7 @@ def main(argv=None):
             continue
       grid_classad += str(line)
 
-   job_queue = '%s-%s' % (queue_name, global_id)
+   job_queue = '%s%s%s' % (cluster_id, proc_id, qdate)
    sqs_data.class_ad += 'AmazonFullSQSQueueName = "%s"\n' % job_queue
    if delay != '':
       sqs_data.class_ad += 'amazonamishutdowndelay = %s\n' % delay
@@ -335,7 +344,7 @@ def main(argv=None):
          os.remove(tarfile_name)
          return(FAILURE)
       else:
-         s3_key.key = str(aws_key_val) + '-' + str(global_id)
+         s3_key.key = '%s-%s' % (str(aws_key_val), job_queue) 
          sqs_data.s3_key = s3_key.key
          try:
             s3_key.set_contents_from_filename(tarfile_name)
