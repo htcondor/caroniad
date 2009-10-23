@@ -1,5 +1,5 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 17
+%define rel 18
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
@@ -21,7 +21,6 @@ Requires: python-condor-job-hooks-common
 Requires: python-condor-ec2-enhanced-hooks-common
 Requires: python-boto >= 1.7a
 Requires: openssl
-Conflicts: condor-low-latency
 
 %description
 The EC2 Enhanced feature allows for near seamless translation of Condor jobs
@@ -66,6 +65,9 @@ exit 0
 %_sbindir/caroniad
 
 %changelog
+* Fri Oct 23 2009  <rrati@redhat> - 1.0-18
+- Removed conflict with condor-low-latency
+
 * Tue Aug 18 2009  <rrati@redhat> - 1.0-17
 - caroniad checks condor_config for its configuration before looking
   in configuration files
