@@ -17,8 +17,8 @@ BuildArch: noarch
 Requires: python >= 2.4
 Requires: condor >= 7.0.2-4
 Requires: condor-job-hooks
-Requires: python-condor-job-hooks-common
-Requires: python-condor-ec2-enhanced-hooks-common
+Requires: python-condorutils
+Requires: python-condorec2e
 Requires: python-boto >= 1.7a
 Requires: openssl
 
@@ -41,9 +41,7 @@ feature.
 %install
 rm -rf %{buildroot}
 mkdir -p %{buildroot}%{_sbindir}
-mkdir -p %{buildroot}/%{_sysconfdir}/condor
 cp -f caroniad %{buildroot}/%_sbindir
-cp -f config/caroniad.conf %{buildroot}/%{_sysconfdir}/condor
 
 %clean
 rm -rf %{buildroot}
@@ -60,7 +58,6 @@ exit 0
 %files
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt INSTALL
-%config(noreplace) %_sysconfdir/condor/caroniad.conf
 %defattr(0755,root,root,-)
 %_sbindir/caroniad
 

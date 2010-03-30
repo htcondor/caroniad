@@ -16,8 +16,8 @@ BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
 Requires: python >= 2.3
 Requires: condor >= 7.2.0-4
-Requires: python-condor-job-hooks-common >= 1.0-4
-Requires: python-%{name}-common
+Requires: python-condorutils
+Requires: python-condorec2e
 Requires: python-boto >= 1.7a
 Requires: openssl
 
@@ -32,15 +32,16 @@ a Condor EC2 job and monitor the state of that job.  This should be installed
 on condor nodes that will submitting work and wish to use the EC2 Enhanced
 feature.
 
-%package -n python-%{name}-common
-Summary: Common functions/utilities for condor job hooks
+%package -n python-condorec2e
+Summary: Common definitions for EC2 Enhanced
 Group: Applications/System
 BuildRequires: python-devel
 Requires: python >= 2.3
 Obsoletes: condor-ec2-enhanced-hooks-common
+Obsoletes: python-condor-ec2-enhanced-hooks-common
 
-%description -n python-%{name}-common
-Common functions and utilities used by MRG condor job hooks.
+%description -n python-condorec2e
+Common definitions used by condor's EC2 Enhanced functionality
 
 %prep
 %setup -q
@@ -50,12 +51,12 @@ Common functions and utilities used by MRG condor job hooks.
 %install
 rm -rf %{buildroot}
 mkdir -p %{buildroot}/%_libexecdir/condor/hooks
-mkdir -p %{buildroot}/%{python_sitelib}/ec2enhanced
+mkdir -p %{buildroot}/%{python_sitelib}/condorec2e
 mkdir -p %{_builddir}/%{name}-%{version}/example
 cp -f hook*.py %{buildroot}/%_libexecdir/condor/hooks
-cp -f functions.py %{buildroot}/%{python_sitelib}/ec2enhanced
+cp -f sqs.py %{buildroot}/%{python_sitelib}/condorec2e
 cp -f config/condor_config.example %{_builddir}/%{name}-%{version}/example
-touch %{buildroot}/%{python_sitelib}/ec2enhanced/__init__.py
+touch %{buildroot}/%{python_sitelib}/condorec2e/__init__.py
 
 %clean
 rm -rf %{buildroot}
@@ -69,11 +70,11 @@ rm -rf %{buildroot}
 %_libexecdir/condor/hooks/hook_cleanup.py*
 %_libexecdir/condor/hooks/hook_retrieve_status.py*
 
-%files -n python-%{name}-common
+%files -n python-condorec2e
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt
-%{python_sitelib}/ec2enhanced/functions.py*
-%{python_sitelib}/ec2enhanced/__init__.py*
+%{python_sitelib}/condorec2e/__init__.py*
+%{python_sitelib}/condorec2e/sqs.py*
 
 %changelog
 * Tue Aug 18 2009  <rrati@redhat> - 1.0-19

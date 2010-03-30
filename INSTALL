@@ -10,17 +10,18 @@ EC2ENHANCED_HOOK_FETCH_WORK = $(LIBEXEC)/hooks/hook_fetch_work.py
 EC2ENHANCED_HOOK_REPLY_FETCH = $(LIBEXEC)/hooks/hook_reply_fetch.py
 
 # Starter hooks
-EC2ENHANCED_HOOK_PREPARE_JOB = $(LIBEXEC)/hooks/hook_prepare_job.py
-EC2ENHANCED_HOOK_UPDATE_JOB_INFO = $(LIBEXEC)/hooks/hook_update_job_status.py
-EC2ENHANCED_HOOK_JOB_EXIT = $(LIBEXEC)/hooks/hook_job_exit.py
+EC2ENHANCED_JOB_HOOK_PREPARE_JOB = $(LIBEXEC)/hooks/hook_prepare_job.py
+EC2ENHANCED_JOB_HOOK_UPDATE_JOB_INFO = $(LIBEXEC)/hooks/hook_update_job_status.py
+EC2ENHANCED_JOB_HOOK_JOB_EXIT = $(LIBEXEC)/hooks/hook_job_exit.py
 
 STARTD_JOB_HOOK_KEYWORD = EC2ENHANCED
-STARTER_JOB_HOOK_KEYWORD = EC2ENHANCED
 
 FetchWorkDelay = 10
 STARTER_UPDATE_INTERVAL = 30
 
 EC2E_DAEMON = $(SBIN)/caroniad
+EC2E_DAEMON_LOG = $(LOG)/CaroniaLog
+MAX_EC2E_DAEMON_LOG = 1000000
 DAEMON_LIST = $(DAEMON_LIST), EC2E_DAEMON
 
 An RSA private key needs to be stored in '/root/.ec2/rsa_key" on the AMI.
@@ -33,13 +34,21 @@ first look for its configuration in condor's configuration files.  The
 following parameters can be placed in a condor configuration file to
 configure caroniad:
 
+EC2E_DAEMON_LOG:
+   Type: String
+   Desc: The location of the log file for the caroniad to use for logging
+
+MAX_EC2E_DAEMON_LOG:
+   Type: Integer
+   Desc: The maximum size of the log file before it will be rotated
+
 EC2E_DAEMON_IP:
    Type: IP Address
-   Desc: The IP address of the interface carod use for connections
+   Desc: The IP address of the interface caroniad use for connections
 
 EC2E_DAEMON_PORT:
    Type: Integer
-   Desc: The port carod should use to listen for connections
+   Desc: The port caroniad should use to listen for connections
 
 EC2E_DAEMON_QUEUED_CONNECTIONS:
    Type: Integer

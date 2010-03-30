@@ -15,14 +15,17 @@
 
 import sys
 import os
-import syslog
+import logging
 import re
 import pickle
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 from boto.sqs.connection import SQSConnection
-from jobhooks.functions import *
-from ec2enhanced.functions import *
+from condorutils import SUCCESS, FAILURE
+from condorutils.log import *
+from condorutils.osutil import grep
+from condorutils.readconfig import *
+from condorec2e.sqs import *
 
 def main(argv=None):
    if argv == None:
@@ -38,6 +41,21 @@ def main(argv=None):
    update_skip_attribs = ['jobstatus', 'imagesize', 'enteredcurrentstatus',
                           'jobstartdate']
    attempts = 0
+   log_name = os.path.basename(argv[0])
+
+   # Configure the logging system
+   try:
+      file = read_condor_config('EC2E_HOOK', ['LOG'])
+   except ConfigError, error:
+      sys.stderr.write('Error: %s.  Exiting' % error.msg)
+      return(FAILURE)
+
+   try:
+      size = int(read_condor_config('MAX_EC2E_HOOK', ['LOG'])['log'])
+   except:
+      size = 1000000
+
+   base_logger = create_file_logger(log_name, '%s.status' % file['log'], logging.INFO, size=size)
 
    for line in sys.stdin:
       match = grep('^([^=]*)\s*=\s*(.*)$', line.lstrip())
@@ -70,7 +88,7 @@ def main(argv=None):
 
    # Get the specified Amazon key information
    if os.path.exists(aws_key) == False or os.path.exists(aws_secret) == False:
-      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to read AWS key files')
+      log(logging.ERROR, log_name, 'Unable to read AWS key files')
       sys.stderr.write('Error: Unable to read AWS key files')
       return(FAILURE)
    else:
@@ -85,7 +103,7 @@ def main(argv=None):
    try:
       sqs_con = SQSConnection(aws_key_val, aws_secret_val)
    except BotoServerError, error:
-      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to connect to SQS: %s, %s' % (error.reason, error.body))
+      log(logging.ERROR, log_name, 'Unable to connect to SQS: %s, %s' % (error.reason, error.body))
       sys.stderr.write('Error: Unable to connect to SQS: %s, %s\n' % (error.reason, error.body))
       return(FAILURE)
       
@@ -93,7 +111,7 @@ def main(argv=None):
    try:
       sqs_queue = sqs_con.get_queue(sqs_queue_name)
    except BotoServerError, error:
-      syslog.syslog(syslog.LOG_ERR, 'Error: Unable to retrieve SQS queue "%s": %s, %s'% (sqs_queue_name, error.reason, error.body))
+      log(logging.ERROR, log_name, 'Unable to retrieve SQS queue "%s": %s, %s'% (sqs_queue_name, error.reason, error.body))
       sys.stderr.write('Error: Unable to retrieve SQS queue "%s": %s, %s\n'% (sqs_queue_name, error.reason, error.body))
       return(FAILURE)
 

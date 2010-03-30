@@ -109,7 +109,12 @@ MAX_HISTORY_ROTATIONS = 20
 ##--------------------------------------------------------------------
 ##  Job Router Hooks Configuration
 ##--------------------------------------------------------------------
-JOB_ROUTER_HOOK_TRANSLATE_JOB = $(LIBEXEC)/hooks/hook_translate.py
-JOB_ROUTER_HOOK_UPDATE_JOB_INFO = $(LIBEXEC)/hooks/hook_retrieve_status.py
-JOB_ROUTER_HOOK_JOB_EXIT = $(LIBEXEC)/hooks/hook_job_finalize.py
-JOB_ROUTER_HOOK_JOB_CLEANUP = $(LIBEXEC)/hooks/hook_cleanup.py
+EC2E_HOOK_TRANSLATE_JOB = $(LIBEXEC)/hooks/hook_translate.py
+EC2E_HOOK_UPDATE_JOB_INFO = $(LIBEXEC)/hooks/hook_retrieve_status.py
+EC2E_HOOK_JOB_EXIT = $(LIBEXEC)/hooks/hook_job_finalize.py
+EC2E_HOOK_JOB_CLEANUP = $(LIBEXEC)/hooks/hook_cleanup.py
+EC2E_ATTRS_TO_COPY = EC2RunAttempts, EC2JobSuccessful
+JOB_ROUTER_HOOK_KEYWORD = EC2E
+
+EC2E_HOOK_LOG = /tmp/Ec2eHooksLog
+MAX_EC2E_HOOK_LOG = 1000000
