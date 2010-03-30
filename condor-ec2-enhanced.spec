@@ -1,9 +1,9 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 18
+%define rel 0.1
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
-Version: 1.0
+Version: 1.1
 Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
@@ -62,6 +62,15 @@ exit 0
 %_sbindir/caroniad
 
 %changelog
+* Tue Mar 30 2010  <rrati@redhat> - 1.1-0.1
+- Updated INSTALL docs
+- Changed to using condorutils and condorec2e modules
+- Use log logging call install of syslog
+- Renamed exceptions and define locally instead of relying on definition
+  in condorutils
+- Code cleanup
+- Added 2 params for controlling log files
+
 * Fri Oct 23 2009  <rrati@redhat> - 1.0-18
 - Removed conflict with condor-low-latency
 

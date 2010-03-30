@@ -1,9 +1,9 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 19
+%define rel 0.1
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
-Version: 1.0
+Version: 1.1
 Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
@@ -77,6 +77,13 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorec2e/sqs.py*
 
 %changelog
+* Tue Mar 30 2010  <rrati@redhat> - 1.1-0.1
+- Updated INSTALL docs
+- Changed to using condorutils and condorec2e modules
+- Use log logging call install of syslog
+- Added 2 params for controlling log files
+- Renamed functions module to sqs
+
 * Tue Aug 18 2009  <rrati@redhat> - 1.0-19
 - Split the documentation into two files, one for the AMI and one for
   the submit machine
