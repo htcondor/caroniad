@@ -57,6 +57,8 @@ def main(argv=None):
 
    base_logger = create_file_logger(log_name, '%s.status' % file['log'], logging.INFO, size=size)
 
+   log(logging.INFO, log_name, 'Hook running')
+
    for line in sys.stdin:
       match = grep('^([^=]*)\s*=\s*(.*)$', line.lstrip())
       if match != None and match[0] != None and match[1] != None:
@@ -170,6 +172,7 @@ def main(argv=None):
          if update_classad != '':
             print update_classad
 
+   log(logging.INFO, log_name, 'Hook exited')
    return(SUCCESS)
 
 if __name__ == '__main__':

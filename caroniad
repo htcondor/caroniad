@@ -274,7 +274,7 @@ def handle_get_work(req_socket, reply, sqs_con, queue, known_items, log_name):
    """Retrieve a message from an SQS queue and send it back to the
       requesting client"""
    func_name = "handle_get_work"
-   log(logging.DEBUG, log_name, '%s called' % (func_name))
+   log(logging.INFO, log_name, '%s called' % (func_name))
 
    remove_attribs = ['ec2origowner', 'iwd', 'userlog', 'sqsmessageid',
                      'wf_req_slot', 'isfeatched']
@@ -417,7 +417,7 @@ def handle_reply_fetch(msg, sqs_con, work_q, status_q, known_items, log_name):
    """Send the data from a reply claim hook to a results SQS queue.  Release
       the lock on the receiving SQS queue in the case of a reject"""
    func_name = "handle_reply_fetch"
-   log(logging.DEBUG, log_name, '%s called' % func_name)
+   log(logging.INFO, log_name, '%s called' % func_name)
 
    remove_attribs = ['iwd', 'owner']
 
@@ -502,7 +502,9 @@ def handle_reply_fetch(msg, sqs_con, work_q, status_q, known_items, log_name):
             sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
          except:
             log(logging.ERROR, log_name, '%s: Unable to reset visibility timer on "%s"' (func_name, str(message_id)))
-         log(logging.DEBUG, log_name, '%s: Work rejected %s' % (func_name, str(message_id)))
+         log(logging.INFO, log_name, '%s: Work rejected %s' % (func_name, str(message_id)))
+      else:
+         log(logging.INFO, log_name, '%s: Work accepted %s' % (func_name, str(message_id)))
 
       log(logging.DEBUG, log_name, '%s: Releasing lock on %s' % (func_name, str(message_id)))
       saved_work.unlock()
@@ -515,7 +517,7 @@ def handle_prepare_job(req_socket, reply, s3_storage, sqs_con, queue, known_item
       for any data specific to the job and providing it to codor's 
       temporary execute directory."""
    func_name = "handle_prepare_job"
-   log(logging.DEBUG, log_name, '%s called ' % func_name)
+   log(logging.INFO, log_name, '%s called ' % func_name)
 
    # Find the SQSMessageId in the message received
    message_ids = grep('^SQSMessageId\s*=\s*"(.+)"$', reply.data)
@@ -598,7 +600,7 @@ def handle_prepare_job(req_socket, reply, s3_storage, sqs_con, queue, known_item
 def handle_update_job_status(msg, queue, known_items, log_name):
    """Send the job status update information to a results SQS queue."""
    func_name = "handle_update_job_status"
-   log(logging.DEBUG, log_name, '%s called at %s' % (func_name, str(time.localtime())))
+   log(logging.INFO, log_name, '%s called at %s' % (func_name, str(time.localtime())))
 
    remove_attribs = ['iwd', 'owner']
 
@@ -675,7 +677,7 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
       otherwise release the lock on the work.  Always place the results
       on the SQS results queue"""
    func_name = "handle_exit"
-   log(logging.DEBUG, log_name, '%s called' % func_name)
+   log(logging.INFO, log_name, '%s called' % func_name)
 
    file_list = []
    remove_attribs = ['iwd', 'owner', 'jobfinishedhookdone', ]
@@ -1009,6 +1011,12 @@ def main(argv=None):
 
       # Set signal handlers
       signal.signal(signal.SIGINT, exit_signal_handler)
+      signal.signal(signal.SIGTERM, exit_signal_handler)
+      if os.name != 'nt' and os.name != 'ce':
+         # These aren't available on windows
+         signal.signal(signal.SIGQUIT, exit_signal_handler)
+
+      log(logging.INFO, log_name, 'Starting up')
 
       # Decrypt the secret key in the user_data
       file = open('/root/data', 'w')

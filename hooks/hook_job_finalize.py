@@ -76,6 +76,8 @@ def main(argv=None):
 
    base_logger = create_file_logger(log_name, '%s.finalize' % file['log'], logging.INFO, size=size)
 
+   log(logging.INFO, log_name, 'Hook running')
+
    # Read the source class ad from stdin and store it as well as the
    # job status.  The end of the source job is noted by '------'
    for line in sys.stdin:
@@ -303,6 +305,7 @@ def main(argv=None):
    if done_classad != '':
       print done_classad
 
+   log(logging.INFO, log_name, 'Hook exited')
    return(SUCCESS)
 
 if __name__ == '__main__':

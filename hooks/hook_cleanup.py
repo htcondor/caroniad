@@ -53,6 +53,8 @@ def main(argv=None):
 
    base_logger = create_file_logger(log_name, '%s.cleanup' % file['log'], logging.INFO, size=size)
 
+   log(logging.INFO, log_name, 'Hook running')
+
    # Read the class ad from stdin and store the S3 information
    for line in sys.stdin:
       match = grep('^([^=]*)\s*=\s*(.*)$', line.lstrip())
@@ -214,6 +216,7 @@ def main(argv=None):
          sys.stderr.write('Error: Unable to remove status SQS queue: %s, %s\n' % (error.reason, error.body))
          ret_val = FAILURE
 
+   log(logging.INFO, log_name, 'Hook exited')
    return(ret_val)
 
 if __name__ == '__main__':

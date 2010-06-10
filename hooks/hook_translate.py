@@ -83,6 +83,8 @@ def main(argv=None):
 
    base_logger = create_file_logger(log_name, '%s.translate' % file['log'], logging.INFO, size=size)
 
+   log(logging.INFO, log_name, 'Hook running')
+
    # Parse the route information from stdin.
    route = grep('^\[\s*(.*)\s*\]$', sys.stdin.readline())[0]
    for line in route.split(';'):
@@ -408,6 +410,7 @@ def main(argv=None):
    # Print the Converted Amazon job to stdout
    print grid_classad
 
+   log(logging.INFO, log_name, 'Hook exited')
    return(SUCCESS)
 
 if __name__ == '__main__':
