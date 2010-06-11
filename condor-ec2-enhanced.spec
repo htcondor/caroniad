@@ -1,5 +1,5 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 0.1
+%define rel 0.2
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
@@ -62,6 +62,10 @@ exit 0
 %_sbindir/caroniad
 
 %changelog
+* Fri Jun 11 2010  <rrati@redhat> - 1.1-0.2
+- Additional logging
+- Additional signal handling
+
 * Tue Mar 30 2010  <rrati@redhat> - 1.1-0.1
 - Updated INSTALL docs
 - Changed to using condorutils and condorec2e modules

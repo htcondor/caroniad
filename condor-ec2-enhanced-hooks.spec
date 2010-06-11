@@ -1,5 +1,5 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 0.1
+%define rel 0.2
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
@@ -77,6 +77,9 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorec2e/sqs.py*
 
 %changelog
+* Fri Jun 11 2010  <rrati@redhat> - 1.1-0.2
+- Logging is to stderr only
+
 * Tue Mar 30 2010  <rrati@redhat> - 1.1-0.1
 - Updated INSTALL docs
 - Changed to using condorutils and condorec2e modules
