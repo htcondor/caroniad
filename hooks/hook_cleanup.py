@@ -15,7 +15,6 @@
 
 import sys
 import os
-import logging
 import re
 import pickle
 from boto.s3.connection import S3Connection
@@ -24,7 +23,6 @@ from boto.sqs.connection import SQSConnection
 from boto.sqs.message import Message
 from boto.exception import *
 from condorutils import SUCCESS, FAILURE
-from condorutils.log import *
 from condorutils.osutil import grep
 from condorutils.readconfig import *
 from condorec2e.sqs import *
@@ -37,23 +35,6 @@ def main(argv=None):
    key = ''
    queue_name = ''
    ret_val = SUCCESS
-   log_name = os.path.basename(argv[0])
-
-   # Configure the logging system
-   try:
-      file = read_condor_config('EC2E_HOOK', ['LOG'])
-   except ConfigError, error:
-      sys.stderr.write('Error: %s.  Exiting' % error.msg)
-      return(FAILURE)
-
-   try:
-      size = int(read_condor_config('MAX_EC2E_HOOK', ['LOG'])['log'])
-   except:
-      size = 1000000
-
-   base_logger = create_file_logger(log_name, '%s.cleanup' % file['log'], logging.INFO, size=size)
-
-   log(logging.INFO, log_name, 'Hook running')
 
    # Read the class ad from stdin and store the S3 information
    for line in sys.stdin:
@@ -84,7 +65,6 @@ def main(argv=None):
    # Pull the specific keys out of the files
    if os.path.exists(aws_key) == False or \
       os.path.exists(aws_secret) == False:
-      log(logging.ERROR, log_name, 'Unable to read AWS key files')
       sys.stderr.write('Error: Unable to read AWS key files')
       return(FAILURE)
    else:
@@ -102,7 +82,6 @@ def main(argv=None):
    try:
       sqs_con = SQSConnection(aws_key_val, aws_secret_val)
    except BotoServerError, error:
-      log(logging.ERROR, log_name, 'Unable to connect to SQS: %s, %s' % (error.reason, error.body))
       sys.stderr.write('Error: Unable to connect to SQS: %s, %s\n' % (error.reason, error.body))
       return(FAILURE)
 
@@ -112,7 +91,6 @@ def main(argv=None):
    try:
       all_queues = sqs_con.get_all_queues()
    except BotoServerError, error:
-      log(logging.ERROR, log_name, 'Unable to retrieve SQS queues: %s, %s'% (sqs_queue_name, error.reason, error.body))
       sys.stderr.write('Error: Unable to retrieve SQS queues: %s, %s\n'% (sqs_queue_name, error.reason, error.body))
       return(FAILURE)
 
@@ -128,7 +106,6 @@ def main(argv=None):
          try:
             q_msg = queue.read()
          except SQSError, error:
-            log(logging.ERROR, log_name, 'Error reading messages from SQS queue "%s": %s, %s' % (q.id, error.reason, error.body))
             sys.stderr.write('Error reading messages from SQS queue "%s": %s, %s\n' % (q.id, error.reason, error.body))
             return(FAILURE)
          while q_msg != None:
@@ -141,7 +118,6 @@ def main(argv=None):
                try:
                   q_msg = queue.read()
                except SQSError, error:
-                  log(logging.ERROR, log_name, 'Error reading messages from SQS queue "%s": %s, %s' % (q.id, error.reason, error.body))
                   sys.stderr.write('Error reading messages from SQS queue "%s": %s, %s\n' % (q.id, error.reason, error.body))
                   return(FAILURE)
                continue
@@ -152,7 +128,6 @@ def main(argv=None):
                   bucket = q_msg.s3_bucket
                except:
                   # Message had no s3_bucket for some reason.
-                  log(logging.ERROR, log_name, 'Message has no S3 bucket\n')
                   sys.stderr.write('Error: Message has no S3 bucket\n')
                   return(FAILURE)
    
@@ -178,14 +153,12 @@ def main(argv=None):
       s3_bucket_obj = s3_con.get_bucket(bucket)
    except BotoServerError, error:
       if grep('Not Found', error.reason) == None:
-         log(logging.ERROR, log_name, 'Error accessing S3 bucket "%s": %s, %s' % (bucket, error.reason, error.body))
          sys.stderr.write('Error accessing S3 bucket "%s": %s, %s\n' % (bucket, error.reason, error.body))
          return(FAILURE)
 
    # Remove the data from S3, if there is any
    if key != '' and ret_val == SUCCESS:
       if s3_bucket_obj == None:
-         log(logging.ERROR, log_name, 'Unable to access S3 to clean up data in S3 bucket %s' % bucket)
          sys.stderr.write('Error: Unable to access S3 to clean up data in S3 bucket %s\n' % bucket)
          return(FAILURE)
       else:
@@ -194,7 +167,6 @@ def main(argv=None):
             if s3_key_obj != None:
                s3_bucket_obj.delete_key(s3_key_obj)
          except S3ResponseError, error:
-            log(logging.ERROR, log_name, 'Unable to delete S3 key "%s": %s, %s' % (key, error.reason, error.body))
             sys.stderr.write('Error: Unable to delete S3 key "%s": %s, %s\n' % (key, error.reason, error.body))
             return(FAILURE)
 
@@ -204,7 +176,6 @@ def main(argv=None):
       try:
          sqs_con.delete_queue(work_queue)
       except BotoServerError, error:
-         log(logging.ERROR, log_name, 'Unable to remove work SQS queue: %s, %s' % (error.reason, error.body))
          sys.stderr.write('Error: Unable to remove work SQS queue: %s, %s\n' % (error.reason, error.body))
          ret_val = FAILURE
 
@@ -212,11 +183,9 @@ def main(argv=None):
       try:
          sqs_con.delete_queue(results_queue)
       except BotoServerError, error:
-         log(logging.ERROR, log_name, 'Unable to remove status SQS queue: %s, %s' % (error.reason, error.body))
          sys.stderr.write('Error: Unable to remove status SQS queue: %s, %s\n' % (error.reason, error.body))
          ret_val = FAILURE
 
-   log(logging.INFO, log_name, 'Hook exited')
    return(ret_val)
 
 if __name__ == '__main__':

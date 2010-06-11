@@ -15,7 +15,6 @@
 
 import sys
 import os
-import logging
 import re
 import pickle
 import tarfile
@@ -27,7 +26,6 @@ from boto.sqs.connection import SQSConnection
 from boto.sqs.message import Message
 from boto.exception import *
 from condorutils import SUCCESS, FAILURE
-from condorutils.log import *
 from condorutils.osutil import grep
 from condorutils.readconfig import *
 from condorec2e.sqs import *
@@ -67,23 +65,6 @@ def main(argv=None):
    delay = ''
    s3_key = ''
    route_name = ''
-   log_name = os.path.basename(argv[0])
-
-   # Configure the logging system
-   try:
-      file = read_condor_config('EC2E_HOOK', ['LOG'])
-   except ConfigError, error:
-      sys.stderr.write('Error: %s.  Exiting' % error.msg)
-      return(FAILURE)
-
-   try:
-      size = int(read_condor_config('MAX_EC2E_HOOK', ['LOG'])['log'])
-   except:
-      size = 1000000
-
-   base_logger = create_file_logger(log_name, '%s.translate' % file['log'], logging.INFO, size=size)
-
-   log(logging.INFO, log_name, 'Hook running')
 
    # Parse the route information from stdin.
    route = grep('^\[\s*(.*)\s*\]$', sys.stdin.readline())[0]
@@ -255,14 +236,12 @@ def main(argv=None):
       if user_aws_public_key != '':
          grid_classad += 'AmazonPublicKey = "%s"\n' % str(user_aws_public_key)
       else:
-         log(logging.ERROR, log_name, 'No Public Key defined by the job or the route')
          sys.stderr.write('Error: No Public Key defined by the job or the route')
          return(FAILURE)
    if aws_private_key == '':
       if user_aws_private_key != '':
          grid_classad += 'AmazonPrivateKey = "%s"\n' % str(user_aws_private_key)
       else:
-         log(logging.ERROR, log_name, 'No Private Key defined by the job or the route')
          sys.stderr.write('Error: No Private Key defined by the job or the route')
          return(FAILURE)
    if aws_key == '':
@@ -270,7 +249,6 @@ def main(argv=None):
          grid_classad += 'AmazonAccessKey = "%s"\n' % str(user_aws_key)
          aws_key_file = user_aws_key
       else:
-         log(logging.ERROR, log_name, 'No Access Key defined by the job or the route')
          sys.stderr.write('Error: No Access Key defined by the job or the route')
          return(FAILURE)
    else:
@@ -280,7 +258,6 @@ def main(argv=None):
          grid_classad += 'AmazonSecretKey = "%s"\n' % str(user_aws_secret)
          aws_secret_file = user_aws_secret
       else:
-         log(logging.ERROR, log_name, 'No Secret Key defined by the job or the route')
          sys.stderr.write('Error: No Secret Key defined by the job or the route')
          return(FAILURE)
    else:
@@ -289,7 +266,6 @@ def main(argv=None):
       if user_rsa_public_key != '':
          rsa_public_key_file = user_rsa_public_key
       else:
-         log(logging.ERROR, log_name, 'No Secret Key defined by the job or the route')
          sys.stderr.write('Error: No Secret Key defined by the job or the route')
          return(FAILURE)
    else:
@@ -301,7 +277,6 @@ def main(argv=None):
    # Pull the specific keys out of the files
    if os.path.exists(aws_key_file) == False or \
       os.path.exists(aws_secret_file) == False:
-      log(logging.ERROR, log_name, 'Unable to read AWS key files')
       sys.stderr.write('Error: Unable to read AWS key files')
       return(FAILURE)
    else:
@@ -326,7 +301,6 @@ def main(argv=None):
    try:
       s3_con = S3Connection(aws_key_val, aws_secret_val)
    except BotoServerError, error:
-      log(logging.ERROR, log_name, 'Unable to connect to S3: %s, %s' % (error.reason, error.body))
       sys.stderr.write('Error: Unable to connect to S3: %s, %s\n' % (error.reason, error.body))
       return(FAILURE)
       
@@ -334,7 +308,6 @@ def main(argv=None):
    try:
       s3_bucket = s3_con.create_bucket(s3_bucket_name)
    except BotoServerError, error:
-      log(logging.ERROR, log_name, 'Unable to create S3 bucket "%s": %s, %s' % (s3_bucket_name, error.reason, error.body))
       sys.stderr.write('Error: Unable to create S3 bucket "%s": %s, %s\n' % (s3_bucket_name, error.reason, error.body))
       return(FAILURE)
    sqs_data.s3_bucket = s3_bucket_name
@@ -353,14 +326,12 @@ def main(argv=None):
             data_files.addfile(tar_obj, file_obj)
             file_obj.close()
          else:
-            log(logging.ERROR, log_name, 'Unable to find file "%s"' % file)
             sys.stderr.write('Error: Unable to find file "%s"\n' % file)
             os.remove(tarfile_name)
             return(FAILURE)
       data_files.close()
       s3_key = Key(s3_bucket)
       if s3_key == None:
-         log(logging.ERROR, log_name, 'Unable to access S3 to set job data in S3 bucket %s' % s3_bucket_name)
          sys.stderr.write('Error: Unable to access S3 to set job data in S3 bucket %s\n' % s3_bucket_name)
          os.remove(tarfile_name)
          return(FAILURE)
@@ -370,7 +341,6 @@ def main(argv=None):
          try:
             s3_key.set_contents_from_filename(tarfile_name)
          except BotoServerError, error:
-            log(logging.ERROR, log_name, 'Unable place job data files into S3 bucket %s, key %s: %s, %s' % (s3_bucket_name, s3_key.key, error.reason, error.body))
             sys.stderr.write('Error: Unable place job data files into S3 bucket %s, key %s: %s, %s\n' % (s3_bucket_name, s3_key.key, error.reason, error.body))
             os.remove(tarfile_name)
             return(FAILURE)
@@ -383,13 +353,11 @@ def main(argv=None):
    try:
       sqs_con = SQSConnection(aws_key_val, aws_secret_val)
    except BotoServerError, error:
-      log(logging.ERROR, log_name, 'Unable to connect to SQS: %s, %s' % (error.reason, error.body))
       sys.stderr.write('Error: Unable to connect to SQS: %s, %s\n' % (error.reason, error.body))
       if s3_key != '':
          try:
             s3_bucket.delete_key(s3_key)
          except BotoServerError, error:
-            log(logging.ERROR, log_name, 'Unable to remove job data from S3: %s, %s' % (error.reason, error.body))
             sys.stderr.write('Error: Unable to remove job data from S3: %s, %s\n')
       return(FAILURE)
 
@@ -397,20 +365,17 @@ def main(argv=None):
       sqs_queue = sqs_con.create_queue(sqs_queue_name)
       sqs_queue.write(message)
    except BotoServerError, error:
-      log(logging.ERROR, log_name, 'Unable to write job to SQS queue "%s": %s, %s' % (sqs_queue_name, error.reason, error.body))
       sys.stderr.write('Error: Unable to write job to SQS queue "%s": %s, %s\n' % (sqs_queue_name, error.reason, error.body))
       if s3_key != '':
          try:
             s3_bucket.delete_key(s3_key)
          except BotoServerError, error:
-            log(logging.ERROR, log_name, 'Unable to remove job data from S3: %s, %s' % (error.reason, error.body))
             sys.stderr.write('Error: Unable to remove job data from S3: %s, %s\n' % (error.reason, error.body))
       return(FAILURE)
 
    # Print the Converted Amazon job to stdout
    print grid_classad
 
-   log(logging.INFO, log_name, 'Hook exited')
    return(SUCCESS)
 
 if __name__ == '__main__':
