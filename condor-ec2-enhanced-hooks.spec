@@ -1,5 +1,5 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 0.2
+%define rel 1
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
@@ -16,15 +16,15 @@ BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
 Requires: python >= 2.3
 Requires: condor >= 7.2.0-4
-Requires: python-condorutils
-Requires: python-condorec2e
+Requires: python-condorutils >= 1.4
+Requires: python-condorec2e >= 1.1
 Requires: python-boto >= 1.7a
 Requires: openssl
 
 %description
 The EC2 Enhanced feature allows for near seamless translation of Condor jobs
-in the standard universe to condor EC2 jobs in the grid universe.  For all
-intents and purposes, the job runs as any standard universe job runs except
+in the vanilla universe to condor EC2 jobs in the grid universe.  For all
+intents and purposes, the job runs as any vanilla universe job runs except
 on an Amazon EC2 AMI instance.
 
 This package provides Condor job router hooks that will translate a job into
@@ -77,6 +77,11 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorec2e/sqs.py*
 
 %changelog
+* Mon Jun 28 2010  <rrati@redhat> - 1.1-1
+- Added versions on deps for python-ec2e and python-condorutils
+- Fixed description (standard -> vanilla)
+- Typo fixes
+
 * Fri Jun 11 2010  <rrati@redhat> - 1.1-0.2
 - Logging is to stderr only
 

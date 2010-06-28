@@ -1,5 +1,5 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 0.2
+%define rel 1
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
@@ -17,15 +17,15 @@ BuildArch: noarch
 Requires: python >= 2.4
 Requires: condor >= 7.0.2-4
 Requires: condor-job-hooks
-Requires: python-condorutils
-Requires: python-condorec2e
+Requires: python-condorutils >= 1.4
+Requires: python-condorec2e >= 1.1
 Requires: python-boto >= 1.7a
 Requires: openssl
 
 %description
 The EC2 Enhanced feature allows for near seamless translation of Condor jobs
-in the standard universe to condor EC2 jobs in the grid universe.  For all
-intents and purposes, the job runs as any standard universe job runs except
+in the vanilla universe to condor EC2 jobs in the grid universe.  For all
+intents and purposes, the job runs as any vanilla universe job runs except
 on an Amazon EC2 AMI instance.
 
 This package contains the daemon that handles the communication between
@@ -62,6 +62,10 @@ exit 0
 %_sbindir/caroniad
 
 %changelog
+* Mon Jun 28 2010  <rrati@redhat> - 1.1-1
+- Added versions on deps for python-ec2e and python-condorutils
+- Fixed description (standard -> vanilla)
+
 * Fri Jun 11 2010  <rrati@redhat> - 1.1-0.2
 - Additional logging
 - Additional signal handling
