@@ -320,7 +320,7 @@ def handle_get_work(req_socket, reply, sqs_con, queue, known_items, log_name):
          q_msg = queue.read(10)
       except:
          log(logging.ERROR, log_name, 'Unable to get a job from from SQS')
-         return(FALIURE)
+         return(FAILURE)
       try:
          msg = pickle.loads(q_msg.get_body())
          valid_message = 1
@@ -425,7 +425,7 @@ def handle_reply_fetch(msg, sqs_con, work_q, status_q, known_items, log_name):
    message_ids = grep('^SQSMessageId\s*=\s*"(.+)"$', msg.data)
    if message_ids == None:
       log(logging.ERROR, log_name, msg.data, '%s: Unable to find SQS Message ID in exit message' % func_name)
-      return(FALIURE)
+      return(FAILURE)
    else:
       message_id = message_ids[0].rstrip().lstrip()
 
