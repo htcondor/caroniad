@@ -1,5 +1,5 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 1
+%define rel 2
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
@@ -7,10 +7,7 @@ Version: 1.1
 Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
-URL: http://www.redhat.com/mrg
-# This is a Red Hat maintained package which is specific to
-# our distribution.  Thus the source is only available from
-# within this srpm.
+URL: http://git.fedorahosted.org/git/grid/caroniad.git
 Source0: %{name}-%{version}-%{rel}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
@@ -62,6 +59,9 @@ exit 0
 %_sbindir/caroniad
 
 %changelog
+* Mon Jan  3 2011  <rrati@redhat> - 1.1-2
+- Updated source URL
+
 * Mon Jun 28 2010  <rrati@redhat> - 1.1-1
 - Added versions on deps for python-ec2e and python-condorutils
 - Fixed description (standard -> vanilla)

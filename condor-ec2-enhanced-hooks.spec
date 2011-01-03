@@ -1,5 +1,5 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 1
+%define rel 2
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
@@ -7,10 +7,7 @@ Version: 1.1
 Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
-URL: http://www.redhat.com/mrg
-# This is a Red Hat maintained package which is specific to
-# our distribution.  Thus the source is only available from
-# within this srpm.
+URL: http://git.fedorahosted.org/git/grid/caroniad.git
 Source0: %{name}-%{version}-%{rel}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
@@ -77,6 +74,10 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorec2e/sqs.py*
 
 %changelog
+* Mon Jan  3 2011  <rrati@redhat> - 1.1-2
+- Updated source URL
+- Remove mention of EC2E_HOOK params from the example config file
+
 * Mon Jun 28 2010  <rrati@redhat> - 1.1-1
 - Added versions on deps for python-ec2e and python-condorutils
 - Fixed description (standard -> vanilla)
