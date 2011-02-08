@@ -1,5 +1,5 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 2
+%define rel 3
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
@@ -14,7 +14,7 @@ BuildArch: noarch
 Requires: python >= 2.4
 Requires: condor >= 7.0.2-4
 Requires: condor-job-hooks
-Requires: python-condorutils >= 1.4
+Requires: python-condorutils >= 1.5
 Requires: python-condorec2e >= 1.1
 Requires: python-boto >= 1.7a
 Requires: openssl
@@ -59,6 +59,9 @@ exit 0
 %_sbindir/caroniad
 
 %changelog
+* Mon Feb  8 2011  <rrati@redhat> - 1.1-3
+- Updated dep on python-condorutils
+
 * Mon Jan  3 2011  <rrati@redhat> - 1.1-2
 - Updated source URL
 
