@@ -1,5 +1,5 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 2
+%define rel 3
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
@@ -74,6 +74,11 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorec2e/sqs.py*
 
 %changelog
+* Thu Mar 17 2011  <rrati@redhat> - 1.1-3
+- Removed the setting of the GridResource in the example routes
+- Updated the job finalize hook to work with newer versions of python
+- Added dep on python-condorutils >= 1.5
+
 * Mon Jan  3 2011  <rrati@redhat> - 1.1-2
 - Updated source URL
 - Remove mention of EC2E_HOOK params from the example config file
