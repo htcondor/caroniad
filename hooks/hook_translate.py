@@ -373,6 +373,22 @@ def main(argv=None):
             sys.stderr.write('Error: Unable to remove job data from S3: %s, %s\n' % (error.reason, error.body))
       return(FAILURE)
 
+   # Determine which grid resource to use.  If the ec2 gahp exists, use that
+   # otherwise use the amazon resource
+   try:
+      sbin = read_condor_config('', ['SBIN'])['sbin']
+   except ConfigError, error:
+      sys.stderr.write('Error: %s' % error.msg)
+      return(FAILURE)
+   except Exception, e:
+      sys.stderr.write('Error: %s' % e)
+      return(FAILURE)
+
+   if os.path.exists('%s/ec_gahp' % sbin) == True:
+      grid_classad += 'GridResource = "ec2"'
+   else:
+      grid_classad += 'GridResource = "amazon"'
+
    # Print the Converted Amazon job to stdout
    print grid_classad
 

@@ -21,7 +21,6 @@ JOB_ROUTER_ENTRIES = \
   [ GridResource = "condor localhost $(COLLECTOR_HOST)"; \
     Name = "Amazon Small"; \
     requirements=target.WantAWS is true && (target.Universe is vanilla || target.Universe is 5) && (target.WantArch is "INTEL" || target.WantArch is UNDEFINED) && (target.WantCpus <= 1 || target.WantCpus is UNDEFINED) && (target.WantMemory < 1.7 || target.WantMemory is UNDEFINED) && (target.WantDisk < 160 || target.WantDisk is UNDEFINED); \
-    set_gridresource = "amazon"; \
     set_amazonpublickey = "<path_to_AWS_public key>"; \
     set_amazonprivatekey = "<path_to_AWS_private_key>"; \
     set_amazonaccesskey = "<path_to_AWS_access_key>"; \
@@ -36,7 +35,6 @@ JOB_ROUTER_ENTRIES = \
   [ GridResource = "condor localhost $(COLLECTOR_HOST)"; \
     Name = "Amazon High-CPU Medium"; \
     requirements=target.WantAWS is true && (target.Universe is vanilla || target.Universe is 5) && (target.WantArch is "INTEL" || target.WantArch is UNDEFINED) && ((target.WantCpus > 1 && target.WantCpus <= 5) || (target.WantDisk > 160 && target.WantDisk <= 350)); \
-    set_gridresource = "amazon"; \
     set_amazonpublickey = "<path_to_AWS_public key>"; \
     set_amazonprivatekey = "<path_to_AWS_private_key>"; \
     set_amazonaccesskey = "<path_to_AWS_access_key>"; \
@@ -51,7 +49,6 @@ JOB_ROUTER_ENTRIES = \
   [ GridResource = "condor localhost $(COLLECTOR_HOST)"; \
     Name = "Amazon High-CPU Extra Large"; \
     requirements=target.WantAWS is true && (target.Universe is vanilla || target.Universe is 5) && target.WantArch is "X86_64" && target.WantCpus > 8 && target.WantCpus <= 20 && (target.WantMemory <= 7 || target.WantMemory is UNDEFINED) && (target.WantDisk <= 1690 || target.WantDisk is UNDEFINED); \
-    set_gridresource = "amazon"; \
     set_amazonpublickey = "<path_to_AWS_public key>"; \
     set_amazonprivatekey = "<path_to_AWS_private_key>"; \
     set_amazonaccesskey = "<path_to_AWS_access_key>"; \
@@ -66,7 +63,6 @@ JOB_ROUTER_ENTRIES = \
   [ GridResource = "condor localhost $(COLLECTOR_HOST)"; \
     Name = "Amazon XLarge"; \
     requirements=target.WantAWS is true && (target.Universe is vanilla || target.Universe is 5) && target.WantArch is "X86_64" && ((target.WantMemory > 7.5 && target.WantMemory <= 15) || (target.WantDisk > 850 && target.WantDisk < 1690) || (target.WantCpus > 4 && target.WantCpus <= 8)); \
-    set_gridresource = "amazon"; \
     set_amazonpublickey = "<path_to_AWS_public key>"; \
     set_amazonprivatekey = "<path_to_AWS_private_key>"; \
     set_amazonaccesskey = "<path_to_AWS_access_key>"; \
@@ -81,7 +77,6 @@ JOB_ROUTER_ENTRIES = \
   [ GridResource = "condor localhost $(COLLECTOR_HOST)"; \
     Name = "Amazon Large"; \
     requirements=target.WantAWS is true && (target.Universe is vanilla || target.Universe is 5) && target.WantArch is "X86_64" && (target.WantCpus <= 4 || target.WantCpus is UNDEFINED) && (target.WantMemory <= 7.5 || target.WantMemory is UNDEFINED) && (target.WantDisk <= 850 || target.WantDisk is UNDEFINED); \
-    set_gridresource = "amazon"; \
     set_amazonpublickey = "<path_to_AWS_public key>"; \
     set_amazonprivatekey = "<path_to_AWS_private_key>"; \
     set_amazonaccesskey = "<path_to_AWS_access_key>"; \

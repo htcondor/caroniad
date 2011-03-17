@@ -206,7 +206,19 @@ def main(argv=None):
             os.rename(remap_info[0], remap_info[1])
 
    for file in os.listdir('.'):
-      shutil.move(file, iwd)
+      try:
+         dest_file = '%s/%s' % (iwd, file)
+         if os.path.exists(dest_file):
+            # Only copy files if they are different in size.  This is needed
+            # because newer versions of shutil execpt if the destination file
+            # exists.
+            if os.stat(dest_file).st_size != os.stat(file).st_size:
+               shutil.copy2(file, iwd)
+               os.unlink(file)
+         else:
+            shutil.move(file, iwd)
+      except Exception, e:
+         sys.stderr.write('Warning: %s\n' % e)
 
    # Remove the data from S3
    if s3_bucket_obj != '':

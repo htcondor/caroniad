@@ -13,7 +13,7 @@ BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
 Requires: python >= 2.3
 Requires: condor >= 7.2.0-4
-Requires: python-condorutils >= 1.4
+Requires: python-condorutils >= 1.5
 Requires: python-condorec2e >= 1.1
 Requires: python-boto >= 1.7a
 Requires: openssl
