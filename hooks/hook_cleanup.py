@@ -38,14 +38,14 @@ def main(argv=None):
 
    # Read the class ad from stdin and store the S3 information
    for line in sys.stdin:
-      match = grep('^([^=]*)\s*=\s*(.*)$', line.lstrip())
+      match = grep('^([^=]*)\s*=\s*(.*)$', line.strip())
       if match != None and match[0] != None and match[1] != None:
-         attribute = match[0].rstrip()
-         val_match = grep('^"(.*)"$', match[1].rstrip())
+         attribute = match[0].strip()
+         val_match = grep('^"(.*)"$', match[1].strip())
          if val_match != None and val_match[0] != None:
-            value = val_match[0].rstrip().lstrip()
+            value = val_match[0].strip()
          else:
-            value = match[1].rstrip().lstrip()
+            value = match[1].strip()
          if attribute.lower() == 's3bucketid':
             bucket = value
             continue
@@ -69,10 +69,10 @@ def main(argv=None):
       return(FAILURE)
    else:
       key_file = open(aws_key, 'r')
-      aws_key_val = key_file.readlines()[0].rstrip()
+      aws_key_val = key_file.readlines()[0].strip()
       key_file.close()
       key_file = open(aws_secret, 'r')
-      aws_secret_val = key_file.readlines()[0].rstrip()
+      aws_secret_val = key_file.readlines()[0].strip()
       key_file.close()
 
    # Remove messages from SQS

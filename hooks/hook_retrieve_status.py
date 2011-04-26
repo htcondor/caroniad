@@ -41,14 +41,14 @@ def main(argv=None):
    attempts = 0
 
    for line in sys.stdin:
-      match = grep('^([^=]*)\s*=\s*(.*)$', line.lstrip())
+      match = grep('^([^=]*)\s*=\s*(.*)$', line.strip())
       if match != None and match[0] != None and match[1] != None:
-         attribute = match[0].rstrip().lstrip()
-         val_match = grep('^"(.*)"$', match[1].rstrip())
+         attribute = match[0].strip()
+         val_match = grep('^"(.*)"$', match[1].strip())
          if val_match != None and val_match[0] != None:
-            value = val_match[0].rstrip().lstrip()
+            value = val_match[0].strip()
          else:
-            value = match[1].rstrip().lstrip()
+            value = match[1].strip()
          if attribute.lower() == 'amazonaccesskey':
             aws_key = value
             continue
@@ -75,10 +75,10 @@ def main(argv=None):
       return(FAILURE)
    else:
       key_file = open(aws_key, 'r')
-      aws_key_val = key_file.readlines()[0].rstrip()
+      aws_key_val = key_file.readlines()[0].strip()
       key_file.close()
       key_file = open(aws_secret, 'r')
-      aws_secret_val = key_file.readlines()[0].rstrip()
+      aws_secret_val = key_file.readlines()[0].strip()
       key_file.close()
 
    # Look for an update
@@ -130,14 +130,14 @@ def main(argv=None):
          # on the number of runs attempts
          run_try = grep('^EC2JobAttempted\s*=\s*(.*)$', status_classad)
          if run_try != None and run_try[0] != None and \
-            run_try[0].rstrip().lower() == 'true':
+            run_try[0].strip().lower() == 'true':
             update_classad += 'EC2RunAttempts = %d\n' % (attempts+1)
 
          # Check the job status to see if this message notifies of
          # job completion
          job_status = grep('^JobStatus\s*=\s*(.)$', status_classad)
          if job_status != None and job_status[0] != None and \
-            int(job_status[0].rstrip()) == 4:
+            int(job_status[0].strip()) == 4:
             # We found an update that indicates the job completed.
             # Add a marker to the classad saying the job has completed.
             update_classad += 'EC2JobSuccessful = True\n'

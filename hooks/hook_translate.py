@@ -65,18 +65,20 @@ def main(argv=None):
    delay = ''
    s3_key = ''
    route_name = ''
+   ami = ''
+   resource_url = 'https://ec2.amazonaws.com/'
 
    # Parse the route information from stdin.
    route = grep('^\[\s*(.*)\s*\]$', sys.stdin.readline())[0]
    for line in route.split(';'):
-      match = grep('^([^=]*)\s*=\s*(.*)$', line.lstrip())
+      match = grep('^([^=]*)\s*=\s*(.*)$', line.strip())
       if match != None and match[0] != None and match[1] != None:
-         attribute = match[0].rstrip()
-         val_match = grep('^"(.*)"$', match[1].rstrip())
+         attribute = match[0].strip()
+         val_match = grep('^"(.*)"$', match[1].strip())
          if val_match != None and val_match[0] != None:
-            value = val_match[0].rstrip().lstrip()
+            value = val_match[0].strip()
          else:
-            value = match[1].rstrip().lstrip()
+            value = match[1].strip()
          if attribute.lower() == 'name':
             route_name = value
             continue
@@ -101,20 +103,23 @@ def main(argv=None):
          if attribute.lower() == 'set_amazonamishutdowndelay':
             delay = value
             continue
+         if attribute.lower() == 'set_amazonamiid':
+            ami = value
+            continue
 
    # Read the original class ad from stdin and store it for submission
    # to SQS.  Additionally, convert it to an EC2 classad for output
    for line in sys.stdin:
-      if line.rstrip() == delim:
+      if line.strip() == delim:
          continue
       match = grep('^([^=]*)\s*=\s*(.*)$', line)
       if match != None and match[0] != None and match[1] != None:
-         attribute = match[0].rstrip()
-         val_match = grep('^"(.*)"$', match[1].rstrip())
+         attribute = match[0].strip()
+         val_match = grep('^"(.*)"$', match[1].strip())
          if val_match != None and val_match[0] != None:
-            value = val_match[0].rstrip().lstrip()
+            value = val_match[0].strip()
          else:
-            value = match[1].rstrip().lstrip()
+            value = match[1].strip()
          if attribute.lower() == 'iwd':
             # Remove the IWD from the class ad so the execute directory
             # will be used
@@ -195,8 +200,8 @@ def main(argv=None):
    for line in sqs_data.class_ad.split('\n'):
       match = grep('^([^=]*)\s*=\s*(.*)$', line)
       if match != None and match[0] != None and match[1] != None:
-         attribute = match[0].rstrip()
-         value = match[1].rstrip()
+         attribute = match[0].strip()
+         value = match[1].strip()
 
          # Ignore files in /dev (like /dev/null)
          if grep('^"/dev/.*"', value) != None:
@@ -220,12 +225,12 @@ def main(argv=None):
                new_ad += line + '\n'
                continue
             if split_val[0] == '':
-               files.append(iwd + '/' + match[0].rstrip() + '\n')
+               files.append(iwd + '/' + match[0].strip() + '\n')
             elif os.path.exists(split_val[0]) == False:
                files.append(iwd + '/' + split_val[1] + '\n')
             else:
-               files.append(match[0].rstrip() + '\n')
-            new_ad += attribute + ' = "' + split_val[1].rstrip() + '"\n'
+               files.append(match[0].strip() + '\n')
+            new_ad += attribute + ' = "' + split_val[1].strip() + '"\n'
             continue
          new_ad += line + '\n'
    sqs_data.class_ad = new_ad
@@ -281,10 +286,10 @@ def main(argv=None):
       return(FAILURE)
    else:
       key_file = open(aws_key_file, 'r')
-      aws_key_val = key_file.readlines()[0].rstrip()
+      aws_key_val = key_file.readlines()[0].strip()
       key_file.close()
       key_file = open(aws_secret_file, 'r')
-      aws_secret_val = key_file.readlines()[0].rstrip()
+      aws_secret_val = key_file.readlines()[0].strip()
       key_file.close()
    sqs_queue_name = '%s-%s' % (str(aws_key_val), job_queue)
 
@@ -292,9 +297,29 @@ def main(argv=None):
    val = popen2('openssl rsautl -inkey "%s" -pubin -encrypt' % rsa_public_key_file)
    val[1].write(aws_secret_val)
    val[1].close()
-   enc_key = val[0].read().rstrip()
+   enc_key = val[0].read().strip()
    aws_user_data = '%s|%s|%s' % (aws_key_val, base64.encodestring(enc_key).replace('\n',''), job_queue)
-   grid_classad += 'AmazonUserData = "%s"\n' % aws_user_data
+
+   # Determine which grid resource to use.  If the ec2 gahp exists, use that
+   # otherwise use the amazon resource
+   try:
+      gahp = read_condor_config('', ['EC2_GAHP'])['ec2_gahp']
+   except ConfigError, error:
+      sys.stderr.write('Error: %s' % error.msg)
+      return(FAILURE)
+   except Exception, e:
+      sys.stderr.write('Error: %s' % e)
+      return(FAILURE)
+
+   if os.path.exists(gahp) == True:
+      grid_classad += 'GridResource = "ec2 %s"\n' % resource_url
+      grid_classad += 'EC2AccessKeyId = "%s"\n' % aws_key
+      grid_classad += 'EC2SecretAccessKey = "%s"\n' % aws_secret
+      grid_classad += 'EC2AmiID = "%s"\n' % ami
+      grid_classad += 'EC2UserData = "%s"\n' % aws_user_data
+   else:
+      grid_classad += 'GridResource = "amazon %s"\n' % resource_url
+      grid_classad += 'AmazonUserData = "%s"\n' % aws_user_data
 
    # Open the connection to Amazon's S3 and create a key input/output of
    # data
@@ -319,9 +344,9 @@ def main(argv=None):
       tarfile_name = '/tmp/archive-' + str(os.getpid()) + '.tar.gz'
       data_files = tarfile.open(tarfile_name, 'w:gz')
       for file in files:
-         if os.path.exists(file.rstrip()) == True:
-            tar_obj = data_files.gettarinfo(file.rstrip())
-            file_obj = open(file.rstrip())
+         if os.path.exists(file.strip()) == True:
+            tar_obj = data_files.gettarinfo(file.strip())
+            file_obj = open(file.strip())
             tar_obj.name = os.path.basename(tar_obj.name)
             data_files.addfile(tar_obj, file_obj)
             file_obj.close()
@@ -372,22 +397,6 @@ def main(argv=None):
          except BotoServerError, error:
             sys.stderr.write('Error: Unable to remove job data from S3: %s, %s\n' % (error.reason, error.body))
       return(FAILURE)
-
-   # Determine which grid resource to use.  If the ec2 gahp exists, use that
-   # otherwise use the amazon resource
-   try:
-      sbin = read_condor_config('', ['SBIN'])['sbin']
-   except ConfigError, error:
-      sys.stderr.write('Error: %s' % error.msg)
-      return(FAILURE)
-   except Exception, e:
-      sys.stderr.write('Error: %s' % e)
-      return(FAILURE)
-
-   if os.path.exists('%s/ec_gahp' % sbin) == True:
-      grid_classad += 'GridResource = "ec2"'
-   else:
-      grid_classad += 'GridResource = "amazon"'
 
    # Print the Converted Amazon job to stdout
    print grid_classad
