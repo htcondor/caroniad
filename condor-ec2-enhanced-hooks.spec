@@ -1,9 +1,9 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 3
+%define rel 1
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
-Version: 1.1
+Version: 1.2
 Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
@@ -14,7 +14,7 @@ BuildArch: noarch
 Requires: python >= 2.3
 Requires: condor >= 7.2.0-4
 Requires: python-condorutils >= 1.5
-Requires: python-condorec2e >= 1.1
+Requires: python-condorec2e = %{version}-%{release}
 Requires: python-boto >= 1.7a
 Requires: openssl
 
@@ -74,6 +74,13 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorec2e/sqs.py*
 
 %changelog
+* Wed Apr 27 2011  <rrati@redhat> - 1.2-1
+- Fixed compatibility with ec2_gahp
+- Enhanced check for the ec2_gahp binary
+- Fixed issue with HookKeyword getting updated in original job and preventing
+  cleanup hook from running
+- Updated dep on python-condorec2e to match hooks package version
+
 * Thu Mar 17 2011  <rrati@redhat> - 1.1-3
 - Removed the setting of the GridResource in the example routes
 - Updated the job finalize hook to work with newer versions of python
