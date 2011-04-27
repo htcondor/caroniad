@@ -304,14 +304,10 @@ def main(argv=None):
    # otherwise use the amazon resource
    try:
       gahp = read_condor_config('', ['EC2_GAHP'])['ec2_gahp']
-   except ConfigError, error:
-      sys.stderr.write('Error: %s' % error.msg)
-      return(FAILURE)
-   except Exception, e:
-      sys.stderr.write('Error: %s' % e)
-      return(FAILURE)
+   except:
+      gahp = ''
 
-   if os.path.exists(gahp) == True:
+   if gahp != '' and os.path.exists(gahp) == True:
       grid_classad += 'GridResource = "ec2 %s"\n' % resource_url
       grid_classad += 'EC2AccessKeyId = "%s"\n' % aws_key
       grid_classad += 'EC2SecretAccessKey = "%s"\n' % aws_secret
