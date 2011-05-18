@@ -1,5 +1,5 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 1
+%define rel 2
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
@@ -74,6 +74,9 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorec2e/sqs.py*
 
 %changelog
+* Wed May 18 2011  <rrati@redhat> - 1.2-2
+- Fixed issues using 64-bit AMIs
+
 * Wed Apr 27 2011  <rrati@redhat> - 1.2-1
 - Fixed compatibility with ec2_gahp
 - Enhanced check for the ec2_gahp binary
