@@ -66,6 +66,7 @@ def main(argv=None):
    s3_key = ''
    route_name = ''
    ami = ''
+   instance = ''
    resource_url = 'https://ec2.amazonaws.com/'
 
    # Parse the route information from stdin.
@@ -105,6 +106,9 @@ def main(argv=None):
             continue
          if attribute.lower() == 'set_amazonamiid':
             ami = value
+            continue
+         if attribute.lower() == 'set_amazoninstancetype':
+            instance = value
             continue
 
    # Read the original class ad from stdin and store it for submission
@@ -312,6 +316,7 @@ def main(argv=None):
       grid_classad += 'EC2AccessKeyId = "%s"\n' % aws_key
       grid_classad += 'EC2SecretAccessKey = "%s"\n' % aws_secret
       grid_classad += 'EC2AmiID = "%s"\n' % ami
+      grid_classad += 'EC2InstanceType = "%s"\n' % instance
       grid_classad += 'EC2UserData = "%s"\n' % aws_user_data
    else:
       grid_classad += 'GridResource = "amazon %s"\n' % resource_url
