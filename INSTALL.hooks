@@ -5,7 +5,7 @@ and condor figured to use the job router hooks installed.  A sample
 configuration file for the submit machine(s) that will enable the EC2 Enhanced
 Feature and allow routing for all EC2 AMI types is located at:
 
-/usr/share/doc/ec2-enhanced-hooks-1.0/example/condor_config.example
+/usr/share/doc/ec2-enhanced-hooks-<ver>/example/condor_config.example
 
 
 Using EC2 Enhanced

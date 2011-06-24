@@ -17,6 +17,8 @@ JOB_ROUTER_DEFAULTS = \
   ]
 
 # Define each of the routes to send jobs on
+
+# Edit/remove routes below as needed
 JOB_ROUTER_ENTRIES = \
   [ GridResource = "condor localhost $(COLLECTOR_HOST)"; \
     Name = "Amazon Small"; \
@@ -90,7 +92,7 @@ JOB_ROUTER_ENTRIES = \
   ]
 
 # Reminder: you must restart Condor for changes to DAEMON_LIST to take effect.
-DAEMON_LIST = $(DAEMON_LIST) JOB_ROUTER
+DAEMON_LIST = $(DAEMON_LIST), JOB_ROUTER
 
 # For testing, set this to a small value to speed things up.
 # Once you are running at large scale, set it to a higher value

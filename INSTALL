@@ -1,28 +1,9 @@
 Configuring the EC2E AMI:
 
-On the EC2 AMI the ec2-enhanced RPM will need to be installed which will
-depend on Condor, and Condor needs to be configured to use job hooks.  The
-following example configures the Job Hooks for EC2 Enhanced with a fetch
-interval of 10 seconds, and an update interval of 30 seconds:
-
-# Startd hooks
-EC2ENHANCED_HOOK_FETCH_WORK = $(LIBEXEC)/hooks/hook_fetch_work.py
-EC2ENHANCED_HOOK_REPLY_FETCH = $(LIBEXEC)/hooks/hook_reply_fetch.py
-
-# Starter hooks
-EC2ENHANCED_JOB_HOOK_PREPARE_JOB = $(LIBEXEC)/hooks/hook_prepare_job.py
-EC2ENHANCED_JOB_HOOK_UPDATE_JOB_INFO = $(LIBEXEC)/hooks/hook_update_job_status.py
-EC2ENHANCED_JOB_HOOK_JOB_EXIT = $(LIBEXEC)/hooks/hook_job_exit.py
-
-STARTD_JOB_HOOK_KEYWORD = EC2ENHANCED
-
-FetchWorkDelay = 10
-STARTER_UPDATE_INTERVAL = 30
-
-EC2E_DAEMON = $(SBIN)/caroniad
-EC2E_DAEMON_LOG = $(LOG)/CaroniaLog
-MAX_EC2E_DAEMON_LOG = 1000000
-DAEMON_LIST = $(DAEMON_LIST), EC2E_DAEMON
+On the EC2 AMI the ec2-enhanced RPM, which depends upon condor, will need
+to be installed.  This RPM will install the caroniad daemon and configure
+condor to use job hooks and run the caroniad daemon.  The job-hooks will
+also need to be configured to communicate with the caroniad daemon.
 
 An RSA private key needs to be stored in '/root/.ec2/rsa_key" on the AMI.
 This key must be able to decrypt data encrypted with the RSA public key
@@ -33,6 +14,10 @@ Next the caroniad daemon must be configured.  The caroniad daemon will
 first look for its configuration in condor's configuration files.  The
 following parameters can be placed in a condor configuration file to
 configure caroniad:
+
+EC2E_DAEMON:
+   Type: String
+   Desc: The caroniad binary with full path
 
 EC2E_DAEMON_LOG:
    Type: String

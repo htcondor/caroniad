@@ -52,7 +52,7 @@ mkdir -p %{buildroot}/%{python_sitelib}/condorec2e
 mkdir -p %{_builddir}/%{name}-%{version}/example
 cp -f hook*.py %{buildroot}/%_libexecdir/condor/hooks
 cp -f sqs.py %{buildroot}/%{python_sitelib}/condorec2e
-cp -f config/condor_config.example %{_builddir}/%{name}-%{version}/example
+cp -f config/60condor-ec2e-hooks.config.example %{_builddir}/%{name}-%{version}/example
 touch %{buildroot}/%{python_sitelib}/condorec2e/__init__.py
 
 %clean

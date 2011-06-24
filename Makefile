@@ -36,7 +36,7 @@ SPECS/${EC2EHOOKS_SPEC}: ${EC2EHOOKS_SPEC}
 SOURCES/${EC2EHOOKS_SOURCE}: hooks/sqs.py hooks/hook_cleanup.py \
                          hooks/hook_job_finalize.py \
                          hooks/hook_retrieve_status.py hooks/hook_translate.py \
-                         config/condor_config.example
+                         config/60condor-ec2e-hooks.config.example
 	mkdir -p SOURCES
 	rm -rf ${EC2EHOOKS_DIR}
 	mkdir ${EC2EHOOKS_DIR}
@@ -44,17 +44,18 @@ SOURCES/${EC2EHOOKS_SOURCE}: hooks/sqs.py hooks/hook_cleanup.py \
 	cp -f hooks/* ${EC2EHOOKS_DIR}
 	cp -f LICENSE-2.0.txt ${EC2EHOOKS_DIR}
 	cp -f INSTALL.hooks ${EC2EHOOKS_DIR}/INSTALL
-	cp -f config/condor_config.example ${EC2EHOOKS_DIR}/config
+	cp -f config/60condor-ec2e-hooks.config.example ${EC2EHOOKS_DIR}/config
 	tar -zcf ${EC2EHOOKS_SOURCE} ${EC2EHOOKS_DIR}
 	mv "${EC2EHOOKS_SOURCE}" SOURCES
 
-SOURCES/${EC2E_SOURCE}: caroniad
+SOURCES/${EC2E_SOURCE}: caroniad config/60condor-ec2e.config
 	mkdir -p SOURCES
 	rm -rf ${EC2E_DIR}
 	mkdir ${EC2E_DIR}
 	mkdir ${EC2E_DIR}/config
 	cp -f caroniad ${EC2E_DIR}
 	cp -f LICENSE-2.0.txt INSTALL ${EC2E_DIR}
+	cp -f config/60condor-ec2e.config ${EC2E_DIR}/config
 	tar -zcf ${EC2E_SOURCE} ${EC2E_DIR}
 	mv "${EC2E_SOURCE}" SOURCES
 

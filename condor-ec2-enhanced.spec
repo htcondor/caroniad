@@ -38,7 +38,9 @@ feature.
 %install
 rm -rf %{buildroot}
 mkdir -p %{buildroot}%{_sbindir}
+mkdir -p %{buildroot}/%_sysconfdir/condor/config.d
 cp -f caroniad %{buildroot}/%_sbindir
+cp -f config/60condor-ec2e.config %{buildroot}/%_sysconfdir/condor/config.d
 
 %clean
 rm -rf %{buildroot}
@@ -55,6 +57,7 @@ exit 0
 %files
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt INSTALL
+%_sysconfdir/condor/config.d/60condor-ec2e.config
 %defattr(0755,root,root,-)
 %_sbindir/caroniad
 
