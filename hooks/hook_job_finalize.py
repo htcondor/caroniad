@@ -58,7 +58,7 @@ def main(argv=None):
    proc = 0
    done_classad = ''
    s3_key = ''
-   remove_attrs = ['HookKeyword']
+   remove_attrs = ['hookkeyword']
 
    # Read the source class ad from stdin and store it as well as the
    # job status.  The end of the source job is noted by '------'
@@ -288,12 +288,12 @@ def main(argv=None):
    if done_classad != '':
       # Remove attributes that shouldn't be updated
       for rm_attr in remove_attrs:
-         for line in done_classad:
+         for line in done_classad.split('\n'):
             match = grep('^([^=]*)\s*=\s*(.*)$', line.lstrip())
             if match != None and match[0] != None and match[1] != None:
                attribute = match[0].strip()
                if rm_attr.lower() == attribute.lower():
-                  done_classad.remove(line)
+                  done_classad = done_classad.replace(line, '')
                   break
 
       print done_classad

@@ -943,15 +943,21 @@ def main(argv=None):
    try:
       # Configure the logging system
       try:
-         file = read_condor_config('EC2E_DAEMON', ['LOG'])
+         file = read_condor_config('CARONIAD', ['LOG'])
       except ConfigError, error:
-         print 'Error: %s.  Exiting' % error.msg
-         return(FAILURE)
+         try:
+            file = read_condor_config('EC2E_DAEMON', ['LOG'])
+         except:
+            print 'Error: %s.  Exiting' % error.msg
+            return(FAILURE)
 
       try:
-         size = int(read_condor_config('', ['MAX_EC2E_DAEMON_LOG'])['max_ec2e_daemon_log'])
+         size = int(read_condor_config('', ['MAX_CARONIAD_LOG'])['max_caroniad_log'])
       except:
-         size = 1000000
+         try:
+            size = int(read_condor_config('', ['MAX_EC2E_DAEMON_LOG'])['max_ec2e_daemon_log'])
+         except:
+            size = 1000000
 
       try:
          opts, args = getopt.getopt(argv[1:], 'dlhp:', ['daemon', 'logdebug', 'help', 'pidfile='])
@@ -1031,14 +1037,17 @@ def main(argv=None):
       queue_name = user_data[2].rstrip()
 
       try:
-         sqs_config = read_condor_config('EC2E_DAEMON', ['IP', 'PORT', 'QUEUED_CONNECTIONS', 'LEASE_TIME', 'LEASE_CHECK_INTERVAL'])
+         sqs_config = read_condor_config('CARONIAD', ['IP', 'PORT', 'QUEUED_CONNECTIONS', 'LEASE_TIME', 'LEASE_CHECK_INTERVAL'])
       except ConfigError, error:
-         log(logging.INFO, log_name, error.msg)
-         log(logging.INFO, log_name, 'Attempting to retrieve config from %s' % conf_file)
          try:
-            sqs_config = read_config_file(conf_file, 'Daemon')
-         except ConfigError, error:
-            raise MainException(logging.ERROR, error.msg,  'Exiting.')
+            sqs_config = read_condor_config('EC2E_DAEMON', ['IP', 'PORT', 'QUEUED_CONNECTIONS', 'LEASE_TIME', 'LEASE_CHECK_INTERVAL'])
+         except:
+            log(logging.INFO, log_name, error.msg)
+            log(logging.INFO, log_name, 'Attempting to retrieve config from %s' % conf_file)
+            try:
+               sqs_config = read_config_file(conf_file, 'Daemon')
+            except ConfigError, error:
+               raise MainException(logging.ERROR, error.msg,  'Exiting.')
 
       # Create a container to share data between threads
       share_data = global_data()
@@ -1067,7 +1076,7 @@ def main(argv=None):
          call(['shutdown',  '-h',  '-P',  'now'])
    
       # Create a thread to monitor work expiration times
-      monitor_thread = threading.Thread(target=lease_monitor, args=(share_data, sqs_config['lease_time'], sqs_config['lease_check_interval'], sqs_connection, work_queue, debug_logging))
+      monitor_thread = threading.Thread(target=lease_monitor, args=(share_data, sqs_config['lease_time'], sqs_config['lease_check_interval'], sqs_connection, work_queue, log_name))
       monitor_thread.setDaemon(True)
       monitor_thread.start()
 

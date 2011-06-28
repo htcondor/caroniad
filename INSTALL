@@ -15,36 +15,36 @@ first look for its configuration in condor's configuration files.  The
 following parameters can be placed in a condor configuration file to
 configure caroniad:
 
-EC2E_DAEMON:
+CARONIAD:
    Type: String
    Desc: The caroniad binary with full path
 
-EC2E_DAEMON_LOG:
+CARONIAD_LOG:
    Type: String
    Desc: The location of the log file for the caroniad to use for logging
 
-MAX_EC2E_DAEMON_LOG:
+MAX_CARONIAD_LOG:
    Type: Integer
    Desc: The maximum size of the log file before it will be rotated
 
-EC2E_DAEMON_IP:
+CARONIAD_IP:
    Type: IP Address
    Desc: The IP address of the interface caroniad use for connections
 
-EC2E_DAEMON_PORT:
+CARONIAD_PORT:
    Type: Integer
    Desc: The port caroniad should use to listen for connections
 
-EC2E_DAEMON_QUEUED_CONNECTIONS:
+CARONIAD_QUEUED_CONNECTIONS:
    Type: Integer
    Desc: The number of allowed outstanding connections
 
-EC2E_DAEMON_LEASE_TIME:
+CARONIAD_LEASE_TIME:
    Type: Integer
    Desc: The maximum amount of time a job is allowed to run without providing
          an update
 
-EC2E_DAEMON_LEASE_CHECK_INTERVAL:
+CARONIAD_LEASE_CHECK_INTERVAL:
    Type: Integer
    Desc: How often to check for lease expiration
 
