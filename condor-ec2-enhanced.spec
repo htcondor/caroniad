@@ -1,9 +1,9 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 3
+%define rel 1
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
-Version: 1.1
+Version: 1.2
 Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
@@ -12,7 +12,7 @@ Source0: %{name}-%{version}-%{rel}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
 Requires: python >= 2.4
-Requires: condor >= 7.0.2-4
+Requires: condor >= 7.4.4-0.9
 Requires: condor-job-hooks
 Requires: python-condorutils >= 1.5
 Requires: python-condorec2e >= 1.1
@@ -62,6 +62,11 @@ exit 0
 %_sbindir/caroniad
 
 %changelog
+* Wed Jun 29 2011  <rrati@redhat> - 1.2-1
+- Install config file into /etc/condor/config.d
+- Changed daemon name in config to CARONIAD, old name still supported
+- Updated docs
+
 * Mon Feb  8 2011  <rrati@redhat> - 1.1-3
 - Updated dep on python-condorutils
 
