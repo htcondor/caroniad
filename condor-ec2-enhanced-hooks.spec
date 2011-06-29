@@ -1,5 +1,5 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 2
+%define rel 3
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
@@ -74,6 +74,10 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorec2e/sqs.py*
 
 %changelog
+* Wed Jun 29 2011  <rrati@redhat> - 1.2-3
+- Updated docs
+- Changed example config file to be easily dropped into /etc/condor/config.d
+
 * Wed May 18 2011  <rrati@redhat> - 1.2-2
 - Fixed issues using 64-bit AMIs
 
