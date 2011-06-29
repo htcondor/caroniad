@@ -195,6 +195,7 @@ def main(argv=None):
    sqs_data.class_ad += 'AmazonFullSQSQueueName = "%s"\n' % job_queue
    if delay != '':
       sqs_data.class_ad += 'amazonamishutdowndelay = %s\n' % delay
+   sqs_data.class_ad += 'WantAWS = False\n'
    grid_classad += 'AmazonFullSQSQueueName = "%s"\n' % job_queue
 
    # Search through the class ad and make modifications to the files/paths
