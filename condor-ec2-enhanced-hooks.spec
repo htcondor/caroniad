@@ -77,6 +77,7 @@ rm -rf %{buildroot}
 * Wed Jun 29 2011  <rrati@redhat> - 1.2-3
 - Updated docs
 - Changed example config file to be easily dropped into /etc/condor/config.d
+- Set WantAWS = False in classad sent to the EC2 AMI
 
 * Wed May 18 2011  <rrati@redhat> - 1.2-2
 - Fixed issues using 64-bit AMIs
