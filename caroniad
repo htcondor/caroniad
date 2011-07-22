@@ -943,10 +943,10 @@ def main(argv=None):
    try:
       # Configure the logging system
       try:
-         file = read_condor_config('CARONIAD', ['LOG'])
+         file = read_condor_config('CARONIAD', ['LOG'], permit_param_only = False)
       except ConfigError, error:
          try:
-            file = read_condor_config('EC2E_DAEMON', ['LOG'])
+            file = read_condor_config('EC2E_DAEMON', ['LOG'], permit_param_only = False)
          except:
             print 'Error: %s.  Exiting' % error.msg
             return(FAILURE)
@@ -1037,10 +1037,10 @@ def main(argv=None):
       queue_name = user_data[2].rstrip()
 
       try:
-         sqs_config = read_condor_config('CARONIAD', ['IP', 'PORT', 'QUEUED_CONNECTIONS', 'LEASE_TIME', 'LEASE_CHECK_INTERVAL'])
+         sqs_config = read_condor_config('CARONIAD', ['IP', 'PORT', 'QUEUED_CONNECTIONS', 'LEASE_TIME', 'LEASE_CHECK_INTERVAL'], permit_param_only = False)
       except ConfigError, error:
          try:
-            sqs_config = read_condor_config('EC2E_DAEMON', ['IP', 'PORT', 'QUEUED_CONNECTIONS', 'LEASE_TIME', 'LEASE_CHECK_INTERVAL'])
+            sqs_config = read_condor_config('EC2E_DAEMON', ['IP', 'PORT', 'QUEUED_CONNECTIONS', 'LEASE_TIME', 'LEASE_CHECK_INTERVAL'], permit_param_only = False)
          except:
             log(logging.INFO, log_name, error.msg)
             log(logging.INFO, log_name, 'Attempting to retrieve config from %s' % conf_file)
