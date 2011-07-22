@@ -285,7 +285,10 @@ def main(argv=None):
    sqs_data.class_ad += 'AmazonSecretKey = "%s"\n' % str(aws_secret_file)
 
    # Pull the specific keys out of the files
-   if os.path.exists(aws_key_file) == False or \
+   if os.path.exists(rsa_public_key_file) == False:
+      sys.stderr.write('Error: Unable to read RSA public key file')
+      return(FAILURE)
+   elif os.path.exists(aws_key_file) == False or \
       os.path.exists(aws_secret_file) == False:
       sys.stderr.write('Error: Unable to read AWS key files')
       return(FAILURE)
