@@ -1,5 +1,5 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 2
+%define rel 3
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
@@ -57,11 +57,14 @@ exit 0
 %files
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt INSTALL
-%_sysconfdir/condor/config.d/60condor-ec2e.config
+%config %_sysconfdir/condor/config.d/60condor-ec2e.config
 %defattr(0755,root,root,-)
 %_sbindir/caroniad
 
 %changelog
+* Mon Aug  9 2011  <rrati@redhat> - 1.2-3
+- Fixed configfile warning
+
 * Fri Jul 22 2011  <rrati@redhat> - 1.2-2
 - Updated dep on python-condorutils
 - Added missing config params to config file
