@@ -293,12 +293,20 @@ def main(argv=None):
       sys.stderr.write('Error: Unable to read AWS key files')
       return(FAILURE)
    else:
-      key_file = open(aws_key_file, 'r')
-      aws_key_val = key_file.readlines()[0].strip()
-      key_file.close()
-      key_file = open(aws_secret_file, 'r')
-      aws_secret_val = key_file.readlines()[0].strip()
-      key_file.close()
+      try:
+        key_file = open(aws_key_file, 'r')
+        aws_key_val = key_file.readlines()[0].strip()
+        key_file.close()
+        key_file = open(aws_secret_file, 'r')
+        aws_secret_val = key_file.readlines()[0].strip()
+        key_file.close()
+        key_file = open(rsa_public_key_file, 'r')
+        key_file.close()
+      except IOError, e:
+        sys.stderr.write("Error:  Unable to open file")
+        sys.stderr.write(str(e))
+        return(FAILURE)
+
    sqs_queue_name = '%s-%s' % (str(aws_key_val), job_queue)
 
    # Encode the secret key
