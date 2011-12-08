@@ -17,13 +17,13 @@ import sys
 import os
 import re
 import pickle
-from boto.s3.connection import S3Connection
-from boto.s3.key import Key
 from boto.sqs.connection import SQSConnection
+from boto.exception import *
 from condorutils import SUCCESS, FAILURE
 from condorutils.osutil import grep
 from condorutils.readconfig import *
 from condorec2e.sqs import *
+from condorec2e.region import *
 
 def main(argv=None):
    if argv == None:
@@ -39,35 +39,37 @@ def main(argv=None):
    update_skip_attribs = ['jobstatus', 'imagesize', 'enteredcurrentstatus',
                           'jobstartdate']
    attempts = 0
+   region = ''
 
    for line in sys.stdin:
       match = grep('^([^=]*)\s*=\s*(.*)$', line.strip())
       if match != None and match[0] != None and match[1] != None:
-         attribute = match[0].strip()
+         attribute = match[0].strip().lower()
          val_match = grep('^"(.*)"$', match[1].strip())
          if val_match != None and val_match[0] != None:
             value = val_match[0].strip()
          else:
             value = match[1].strip()
-         if attribute.lower() == 'amazonaccesskey':
+         if attribute == 'amazonaccesskey':
             aws_key = value
             continue
-         if attribute.lower() == 'amazonsecretkey':
+         if attribute == 'amazonsecretkey':
             aws_secret = value
             continue
-         if attribute.lower() == 'ec2jobsuccessful':
+         if attribute == 'ec2jobsuccessful':
             job_completed = value
             continue
-         if attribute.lower() == 'amazonfullsqsqueuename':
+         if attribute == 'amazonfullsqsqueuename':
             queue_name = value
             continue
-         if attribute.lower() == 'ec2runattempts':
+         if attribute == 'ec2runattempts':
             attempts = int(value)
             continue
-         if attribute.lower() == 's3keyid':
+         if attribute == 's3keyid':
             ad_s3key = value
             continue
-
+         if attribute == 'ec2region':
+            region = value
 
    # Get the specified Amazon key information
    if os.path.exists(aws_key) == False or os.path.exists(aws_secret) == False:
@@ -83,7 +85,8 @@ def main(argv=None):
 
    # Look for an update
    try:
-      sqs_con = SQSConnection(aws_key_val, aws_secret_val)
+      r_obj = AWSRegion.get_sqs_region(region)
+      sqs_con = SQSConnection(aws_key_val, aws_secret_val, region=r_obj)
    except BotoServerError, error:
       sys.stderr.write('Error: Unable to connect to SQS: %s, %s\n' % (error.reason, error.body))
       return(FAILURE)

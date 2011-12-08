@@ -1,5 +1,5 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 4
+%define rel 4pre1
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
@@ -52,6 +52,7 @@ mkdir -p %{buildroot}/%{python_sitelib}/condorec2e
 mkdir -p %{_builddir}/%{name}-%{version}/example
 cp -f hook*.py %{buildroot}/%_libexecdir/condor/hooks
 cp -f sqs.py %{buildroot}/%{python_sitelib}/condorec2e
+cp -f region.py %{buildroot}/%{python_sitelib}/condorec2e
 cp -f config/60condor-ec2e-hooks.config.example %{_builddir}/%{name}-%{version}/example
 touch %{buildroot}/%{python_sitelib}/condorec2e/__init__.py
 
@@ -72,6 +73,7 @@ rm -rf %{buildroot}
 %doc LICENSE-2.0.txt
 %{python_sitelib}/condorec2e/__init__.py*
 %{python_sitelib}/condorec2e/sqs.py*
+%{python_sitelib}/condorec2e/region.py*
 
 %changelog
 * Mon Aug 29 2011  <rrati@redhat> - 1.2-4

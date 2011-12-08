@@ -11,7 +11,6 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-
 class SQSEntry(object):
    def __init__(self, class_ad='', s3_bucket=None, s3_key=None):
       self.__s3_bucket__ = s3_bucket

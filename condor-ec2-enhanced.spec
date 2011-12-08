@@ -1,5 +1,5 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 3
+%define rel 3pre1
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced

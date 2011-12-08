@@ -29,6 +29,7 @@ from condorutils import SUCCESS, FAILURE
 from condorutils.osutil import grep
 from condorutils.readconfig import *
 from condorec2e.sqs import *
+from condorec2e.region import *
 
 def main(argv=None):
    if argv == None:
@@ -68,47 +69,51 @@ def main(argv=None):
    ami = ''
    instance = ''
    resource_url = 'https://ec2.amazonaws.com/'
+   region = ''
 
    # Parse the route information from stdin.
    route = grep('^\[\s*(.*)\s*\]$', sys.stdin.readline())[0]
    for line in route.split(';'):
       match = grep('^([^=]*)\s*=\s*(.*)$', line.strip())
       if match != None and match[0] != None and match[1] != None:
-         attribute = match[0].strip()
+         attribute = match[0].strip().lower()
          val_match = grep('^"(.*)"$', match[1].strip())
          if val_match != None and val_match[0] != None:
             value = val_match[0].strip()
          else:
             value = match[1].strip()
-         if attribute.lower() == 'name':
+         if attribute == 'name':
             route_name = value
             continue
-         if attribute.lower() == 'set_amazonpublickey':
+         if attribute == 'set_amazonpublickey':
             aws_public_key = value
             continue
-         if attribute.lower() == 'set_amazonprivatekey':
+         if attribute == 'set_amazonprivatekey':
             aws_private_key = value
             continue
-         if attribute.lower() == 'set_amazonaccesskey':
+         if attribute == 'set_amazonaccesskey':
             aws_key = value
             continue
-         if attribute.lower() == 'set_amazonsecretkey':
+         if attribute == 'set_amazonsecretkey':
             aws_secret = value
             continue
-         if attribute.lower() == 'set_amazons3bucketname':
+         if attribute == 'set_amazons3bucketname':
             bucket_id = value
             continue
-         if attribute.lower() == 'set_rsapublickey':
+         if attribute == 'set_rsapublickey':
             rsa_public_key = value
             continue
-         if attribute.lower() == 'set_amazonamishutdowndelay':
+         if attribute == 'set_amazonamishutdowndelay':
             delay = value
             continue
-         if attribute.lower() == 'set_amazonamiid':
+         if attribute == 'set_amazonamiid':
             ami = value
             continue
-         if attribute.lower() == 'set_amazoninstancetype':
+         if attribute == 'set_amazoninstancetype':
             instance = value
+            continue
+         if attribute == 'set_ec2region':
+            region = value
             continue
 
    # Read the original class ad from stdin and store it for submission
@@ -119,73 +124,77 @@ def main(argv=None):
       match = grep('^([^=]*)\s*=\s*(.*)$', line)
       if match != None and match[0] != None and match[1] != None:
          attribute = match[0].strip()
+         lower_attr = attribute.lower()
          val_match = grep('^"(.*)"$', match[1].strip())
          if val_match != None and val_match[0] != None:
             value = val_match[0].strip()
          else:
             value = match[1].strip()
-         if attribute.lower() == 'iwd':
+         if lower_attr == 'iwd':
             # Remove the IWD from the class ad so the execute directory
             # will be used
             iwd = value
-         if attribute.lower() == 'amazonpublickey':
+         if lower_attr == 'amazonpublickey':
             if aws_public_key == '':
                user_aws_public_key = value
             continue
-         if attribute.lower() == 'amazonprivatekey':
+         if lower_attr == 'amazonprivatekey':
             if aws_private_key == '':
                user_aws_private_key = value
             continue
-         if attribute.lower() == 'amazonaccesskey':
+         if lower_attr == 'amazonaccesskey':
             if aws_key == '':
                user_aws_key = value
             continue
-         if attribute.lower() == 'amazonsecretkey':
+         if lower_attr == 'amazonsecretkey':
             if aws_secret == '':
                user_aws_secret = value
             continue
-         if attribute.lower() == 'rsapublickey':
+         if lower_attr == 'rsapublickey':
             if rsa_public_key == '':
                user_rsa_public_key = value
             continue
-         if attribute.lower() == 'clusterid':
+         if lower_attr == 'clusterid':
             cluster_id = value
             continue
-         if attribute.lower() == 'procid':
+         if lower_attr == 'procid':
             proc_id = value
             continue
-         if attribute.lower() == 'qdate':
+         if lower_attr == 'qdate':
             qdate = value
             continue
-         if attribute.lower() in skip_attribs:
+         if lower_attr in skip_attribs:
             continue
          sqs_data.class_ad += str(line)
 
-         if attribute.lower() == 'globaljobid':
+         if lower_attr == 'globaljobid':
             continue
-         if attribute.lower() == 'jobuniverse':
+         if lower_attr == 'ec2region':
+            if region == '':
+               region = value
+         if lower_attr == 'jobuniverse':
             grid_classad += 'JobUniverse = 9\n'
             grid_classad += 'Remote_JobUniverse = ' + str(value) + '\n'
             continue
-         if attribute.lower() in int_reset_attribs:
+         if lower_attr in int_reset_attribs:
             grid_classad += attribute + ' = 0\n'
             continue
-         if attribute.lower() in float_reset_attribs:
+         if lower_attr in float_reset_attribs:
             grid_classad += attribute + ' = 0.0\n'
             continue
-         if attribute.lower() == 'jobstatus':
+         if lower_attr == 'jobstatus':
             grid_classad += attribute + ' = 1\n'
             continue
-         if attribute.lower() == 'exitbysignal':
+         if lower_attr == 'exitbysignal':
             grid_classad += attribute + ' = FALSE\n'
             continue
-         if attribute.lower() == 'shouldtransferfiles':
+         if lower_attr == 'shouldtransferfiles':
             create_sandbox = value.lower()
             grid_classad += attribute + ' = "NO"\n'
             continue
-         if attribute.lower() == 'transferexecutable':
+         if lower_attr == 'transferexecutable':
             transfer_exe = value.lower()
-         if attribute.lower() == 'cmd' or attribute.lower() == 'command':
+         if lower_attr == 'cmd' or lower_attr == 'command':
             executable = value
             grid_classad += 'Cmd = "EC2: %s: %s"\n' % (route_name, value)
             continue
@@ -206,6 +215,7 @@ def main(argv=None):
       match = grep('^([^=]*)\s*=\s*(.*)$', line)
       if match != None and match[0] != None and match[1] != None:
          attribute = match[0].strip()
+         attr_lower = attribute.lower()
          value = match[1].strip()
 
          # Ignore files in /dev (like /dev/null)
@@ -222,11 +232,11 @@ def main(argv=None):
          # will fail.  Need to remove any reference to directories so all
          # files will be put in the temporary execute directory on the
          # machine executing the job
-         if attribute.lower() in transfer_attribs and create_sandbox == 'yes':
+         if attr_lower in transfer_attribs and create_sandbox == 'yes':
             # Don't mess with the command if it won't be transfered to
             # the remote system.  This likely means the exe already exists
             # where the job will be executed
-            if attribute.lower() == 'cmd' and transfer_exe == 'false':
+            if attr_lower == 'cmd' and transfer_exe == 'false':
                new_ad += line + '\n'
                continue
             if split_val[0] == '':
@@ -248,12 +258,14 @@ def main(argv=None):
       else:
          sys.stderr.write('Error: No Public Key defined by the job or the route')
          return(FAILURE)
+
    if aws_private_key == '':
       if user_aws_private_key != '':
          grid_classad += 'AmazonPrivateKey = "%s"\n' % str(user_aws_private_key)
       else:
          sys.stderr.write('Error: No Private Key defined by the job or the route')
          return(FAILURE)
+
    if aws_key == '':
       if user_aws_key != '':
          grid_classad += 'AmazonAccessKey = "%s"\n' % str(user_aws_key)
@@ -263,6 +275,7 @@ def main(argv=None):
          return(FAILURE)
    else:
       aws_key_file = aws_key
+
    if aws_secret == '':
       if user_aws_secret != '':
          grid_classad += 'AmazonSecretKey = "%s"\n' % str(user_aws_secret)
@@ -272,6 +285,7 @@ def main(argv=None):
          return(FAILURE)
    else:
       aws_secret_file = aws_secret
+
    if rsa_public_key == '':
       if user_rsa_public_key != '':
          rsa_public_key_file = user_rsa_public_key
@@ -314,7 +328,7 @@ def main(argv=None):
    val[1].write(aws_secret_val)
    val[1].close()
    enc_key = val[0].read().strip()
-   aws_user_data = '%s|%s|%s' % (aws_key_val, base64.encodestring(enc_key).replace('\n',''), job_queue)
+   aws_user_data = '%s|%s|%s|%s' % (aws_key_val, base64.encodestring(enc_key).replace('\n',''), job_queue, region)
 
    # Determine which grid resource to use.  If the ec2 gahp exists, use that
    # otherwise use the amazon resource
@@ -324,6 +338,9 @@ def main(argv=None):
       gahp = ''
 
    if gahp != '' and os.path.exists(gahp) == True:
+      if region != '':
+         resource_url = 'https://ec2.%s.amazonaws.com/' % region
+
       grid_classad += 'GridResource = "ec2 %s"\n' % resource_url
       grid_classad += 'EC2AccessKeyId = "%s"\n' % aws_key
       grid_classad += 'EC2SecretAccessKey = "%s"\n' % aws_secret
@@ -389,7 +406,8 @@ def main(argv=None):
    # Put the original class ad into Amazon's SQS
    message = Message(body=pickle.dumps(sqs_data))
    try:
-      sqs_con = SQSConnection(aws_key_val, aws_secret_val)
+      r_obj = AWSRegion.get_sqs_region(region)
+      sqs_con = SQSConnection(aws_key_val, aws_secret_val, region=r_obj)
    except BotoServerError, error:
       sys.stderr.write('Error: Unable to connect to SQS: %s, %s\n' % (error.reason, error.body))
       if s3_key != '':

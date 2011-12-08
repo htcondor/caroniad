@@ -27,6 +27,7 @@ from condorutils import SUCCESS, FAILURE
 from condorutils.osutil import grep, tarball_extract
 from condorutils.readconfig import *
 from condorec2e.sqs import *
+from condorec2e.region import *
 
 def remove_dir(dir):
    if dir[-1] == os.sep:
@@ -59,6 +60,7 @@ def main(argv=None):
    done_classad = ''
    s3_key = ''
    remove_attrs = ['hookkeyword']
+   region = ''
 
    # Read the source class ad from stdin and store it as well as the
    # job status.  The end of the source job is noted by '------'
@@ -67,28 +69,28 @@ def main(argv=None):
          break
       match = grep('^([^=]*)\s+=\s+(.*)$', line.lstrip())
       if match != None and match[0] != None and match[1] != None:
-         attribute = match[0].rstrip()
+         attribute = match[0].rstrip().lower()
          val_match = grep('^"(.*)"$', match[1].rstrip())
          if val_match != None and val_match[0] != None:
             value = val_match[0].rstrip().lstrip()
          else:
             value = match[1].rstrip().lstrip()
-         if attribute.lower() == 'iwd':
+         if attribute == 'iwd':
             iwd = value
             continue
-         if attribute.lower() == 'transferoutputremaps':
+         if attribute == 'transferoutputremaps':
             remaps = value
             continue
-         if attribute.lower() == 'out' and value.lower() != '_condor_stdout':
+         if attribute == 'out' and value.lower() != '_condor_stdout':
             stdout = value
             continue
-         if attribute.lower() == 'err' and value.lower() != '_condor_stderr':
+         if attribute == 'err' and value.lower() != '_condor_stderr':
             stderr = value
             continue
-         if attribute.lower() == 'clusterid':
+         if attribute == 'clusterid':
             cluster = value
             continue
-         if attribute.lower() == 'procid':
+         if attribute == 'procid':
             proc = value
             continue
 
@@ -97,30 +99,32 @@ def main(argv=None):
    for line in sys.stdin:
       match = grep('^([^=]*)\s*=\s*(.*)$', line.lstrip())
       if match != None and match[0] != None and match[1] != None:
-         attribute = match[0].rstrip()
+         attribute = match[0].rstrip().lower()
          val_match = grep('^"(.*)"$', match[1].rstrip())
          if val_match != None and val_match[0] != None:
             value = val_match[0].rstrip().lstrip()
          else:
             value = match[1].rstrip().lstrip()
-         if attribute.lower() == 's3bucketid':
+         if attribute == 's3bucketid':
             bucket = value
             continue
-         if attribute.lower() == 's3keyid':
+         if attribute == 's3keyid':
             s3_key = value
             continue
-         if attribute.lower() == 'amazonaccesskey':
+         if attribute == 'amazonaccesskey':
             aws_key = value
             continue
-         if attribute.lower() == 'amazonsecretkey':
+         if attribute == 'amazonsecretkey':
             aws_secret = value
             continue
-         if attribute.lower() == 'ec2jobsuccessful':
+         if attribute == 'ec2jobsuccessful':
             ec2_success = value
             continue
-         if attribute.lower() == 'amazonfullsqsqueuename':
+         if attribute == 'amazonfullsqsqueuename':
             queue_name = value
             continue
+         if attribute == 'ec2region':
+            region = value
 
    # If the source job is not in the completed state, but the routed job is
    # then there was a failure running the AMI.  Exit with status 2 so the
@@ -239,7 +243,8 @@ def main(argv=None):
    failed = 1
    for attempt in range(1,5):
       try:
-         sqs_con = SQSConnection(aws_key_val, aws_secret_val)
+         r_obj = AWSRegion.get_sqs_region(region)
+         sqs_con = SQSConnection(aws_key_val, aws_secret_val, region=r_obj)
          failed = 0
          break
       except BotoServerError, error:
@@ -291,8 +296,8 @@ def main(argv=None):
          for line in done_classad.split('\n'):
             match = grep('^([^=]*)\s*=\s*(.*)$', line.lstrip())
             if match != None and match[0] != None and match[1] != None:
-               attribute = match[0].strip()
-               if rm_attr.lower() == attribute.lower():
+               attribute = match[0].strip().lower()
+               if rm_attr.lower() == attribute:
                   done_classad = done_classad.replace(line, '')
                   break
 

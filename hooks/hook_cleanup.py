@@ -26,6 +26,7 @@ from condorutils import SUCCESS, FAILURE
 from condorutils.osutil import grep
 from condorutils.readconfig import *
 from condorec2e.sqs import *
+from condorec2e.region import *
 
 def main(argv=None):
    if argv == None:
@@ -34,33 +35,37 @@ def main(argv=None):
    bucket = ''
    key = ''
    queue_name = ''
+   region = ''
    ret_val = SUCCESS
 
    # Read the class ad from stdin and store the S3 information
    for line in sys.stdin:
       match = grep('^([^=]*)\s*=\s*(.*)$', line.strip())
       if match != None and match[0] != None and match[1] != None:
-         attribute = match[0].strip()
+         attribute = match[0].strip().lower()
          val_match = grep('^"(.*)"$', match[1].strip())
          if val_match != None and val_match[0] != None:
             value = val_match[0].strip()
          else:
             value = match[1].strip()
-         if attribute.lower() == 's3bucketid':
+         if attribute == 's3bucketid':
             bucket = value
             continue
-         if attribute.lower() == 's3keyid':
+         if attribute == 's3keyid':
             key = value
             continue
-         if attribute.lower() == 'amazonaccesskey':
+         if attribute == 'amazonaccesskey':
             aws_key = value
             continue
-         if attribute.lower() == 'amazonsecretkey':
+         if attribute == 'amazonsecretkey':
             aws_secret = value
             continue
-         if attribute.lower() == 'amazonfullsqsqueuename':
+         if attribute == 'amazonfullsqsqueuename':
             queue_name = value
             continue
+         if attribute == 'ec2region':
+            region = value
+
 
    # Pull the specific keys out of the files
    if os.path.exists(aws_key) == False or \
@@ -80,7 +85,8 @@ def main(argv=None):
    results_queue = None
    full_queue_name = '%s-%s' % (str(aws_key_val), queue_name)
    try:
-      sqs_con = SQSConnection(aws_key_val, aws_secret_val)
+      r_obj = AWSRegion.get_sqs_region(region)
+      sqs_con = SQSConnection(aws_key_val, aws_secret_val, region=r_obj)
    except BotoServerError, error:
       sys.stderr.write('Error: Unable to connect to SQS: %s, %s\n' % (error.reason, error.body))
       return(FAILURE)

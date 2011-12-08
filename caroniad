@@ -32,6 +32,7 @@ from condorutils.readconfig import *
 from condorutils.socketutil import *
 from condorutils.workfetch import *
 from condorec2e.sqs import *
+from condorec2e.region import *
 from boto.sqs.connection import SQSConnection
 from boto.sqs.message import Message
 from boto.s3.connection import S3Connection
@@ -218,7 +219,7 @@ def time_monitor(msg_list, sock, mins):
    first_time = 1
    interval = mins * 60
    process = Popen(['cat', '/proc/uptime'], stdout=PIPE)
-   uptime = int(round(float(process.communicate()[0].rstrip().split()[0])))
+   uptime = int(round(float(process.communicate()[0].strip().split()[0])))
    time_from_next_hour = int(round(float((uptime % interval)/60)))
    while True:
       if first_time == 1:
@@ -295,7 +296,7 @@ def handle_get_work(req_socket, reply, sqs_con, queue, known_items, log_name):
    if slots == None:
       log(logging.ERROR, log_name, 'Unable to determine SlotID for request.')
    else:
-      slot = slots[0].rstrip().lstrip()
+      slot = slots[0].strip()
 
    log(logging.DEBUG, log_name, '%s: Checking if slot %s is doing work' % (func_name, str(slot)))
    log(logging.DEBUG, log_name, '%s: Acquiring global message lock for slot check %s' % (func_name, str(slot)))
@@ -346,16 +347,16 @@ def handle_get_work(req_socket, reply, sqs_con, queue, known_items, log_name):
    for line in reply.data.split('\n'):
       match = grep('^([^=]*)\s*=\s*(.*)$', line)
       if match != None and match[0] != None:
-         if match[0].rstrip().lower() in remove_attribs:
+         if match[0].strip().lower() in remove_attribs:
             continue
 
-         if match[0].rstrip().lower() == 'owner' and match[1] != None:
-            ad += '%s = "condor"\n' % match[0].rstrip()
-            ad += 'EC2OrigOwner = %s\n' % match[1].rstrip()
+         if match[0].strip().lower() == 'owner' and match[1] != None:
+            ad += '%s = "condor"\n' % match[0].strip()
+            ad += 'EC2OrigOwner = %s\n' % match[1].strip()
             continue
 
          # Check the file paths
-         if match[1] != None and match[0].rstrip().lower() in file_attribs:
+         if match[1] != None and match[0].strip().lower() in file_attribs:
             paths = grep ('^"(.+)"$', match[1])
             if paths != None and paths[0] != None:
                # We have a quoted string, so split on commas since there
@@ -427,7 +428,7 @@ def handle_reply_fetch(msg, sqs_con, work_q, status_q, known_items, log_name):
       log(logging.ERROR, log_name, msg.data, '%s: Unable to find SQS Message ID in exit message' % func_name)
       return(FAILURE)
    else:
-      message_id = message_ids[0].rstrip().lstrip()
+      message_id = message_ids[0].strip()
 
    log(logging.DEBUG, log_name, '%s: Acquiring global message lock for %s' % (func_name, str(message_id)))
    known_items.lock()
@@ -464,15 +465,15 @@ def handle_reply_fetch(msg, sqs_con, work_q, status_q, known_items, log_name):
          if re.match('---', line) != None:
             break
          elif match != None and match[0] != None:
-            if match[0].rstrip().lower() in remove_attribs:
+            if match[0].strip().lower() in remove_attribs:
                continue
-            elif match[0].rstrip().lower() == 'jobstatus':
+            elif match[0].strip().lower() == 'jobstatus':
                result_ad += 'JobStatus = 2\n'
                continue
-            elif match[0].rstrip() == 'EC2OrigOwner' and match[1] != None:
-               orig_owner = match[1].rstrip()
+            elif match[0].strip() == 'EC2OrigOwner' and match[1] != None:
+               orig_owner = match[1].strip()
                continue
-            elif match[0].rstrip().lower() == 'owner':
+            elif match[0].strip().lower() == 'owner':
                continue
          if line != '':
             result_ad += line + "\n"
@@ -525,7 +526,7 @@ def handle_prepare_job(req_socket, reply, s3_storage, sqs_con, queue, known_item
       log(logging.ERROR, log_name, reply.data, '%s: Unable to find SQSMessageId in prepare job message' % func_name)
       return(FAILURE)
    else:
-      message_id = message_ids[0].rstrip().lstrip()
+      message_id = message_ids[0].strip()
 
    # Find the Current Working Directory of the originating process
    # in the message received
@@ -610,7 +611,7 @@ def handle_update_job_status(msg, queue, known_items, log_name):
       log(logging.ERROR, log_name, msg.data, '%s: Unable to find SQSMessageId in exit message' % func_name)
       return(FAILURE)
    else:
-      message_id = message_ids[0].rstrip().lstrip()
+      message_id = message_ids[0].strip()
 
    log(logging.DEBUG, log_name, '%s: Acquiring global message lock for %s' % (func_name, str(message_id)))
    known_items.lock()
@@ -637,15 +638,15 @@ def handle_update_job_status(msg, queue, known_items, log_name):
       for line in msg.data.split('\n'):
          match = grep('^([^=]*)\s*=\s*(.+)$', line)
          if match != None and match[0] != None:
-            if match[0].rstrip().lower() in remove_attribs:
+            if match[0].strip().lower() in remove_attribs:
                continue
-            elif match[0].rstrip().lower() == 'jobstatus':
+            elif match[0].strip().lower() == 'jobstatus':
                result_ad += 'JobStatus = 2\n'
                continue
-            elif match[0].rstrip() == 'EC2OrigOwner' and match[1] != None:
-               orig_owner = match[1].rstrip()
+            elif match[0].strip() == 'EC2OrigOwner' and match[1] != None:
+               orig_owner = match[1].strip()
                continue
-            elif match[0].rstrip().lower() == 'owner':
+            elif match[0].strip().lower() == 'owner':
                continue
          if line != '':
             result_ad += line + "\n"
@@ -691,7 +692,7 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
    else:
       # Verify the slot sending results is known to be in use.  If not,
       # somehow results have been sent from an unknown slot.
-      slot = slots[0].rstrip().lstrip()
+      slot = slots[0].strip()
       known_items.lock()
       if known_items.slot_in_use(slot) == False:
          log(logging.WARNING, log_name, '%s: Received exit message from unknown slot %s' % (func_name, slot))
@@ -703,7 +704,7 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
       log(logging.ERROR, log_name, msg.data, '%s: Unable to find SQSMessageId in exit message' % func_name)
       return(FAILURE)
    else:
-      message_id = message_ids[0].rstrip().lstrip()
+      message_id = message_ids[0].strip()
 
    # Find the Current Working Directory of the originating process
    # in the message received
@@ -775,16 +776,16 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
             else:
                err_file = grep('^Err\s+=\s+"(.*)"$', msg.data)
                if err_file != None and err_file[0] != None:
-                  file_list.append(os.path.basename(err_file[0].rstrip()))
+                  file_list.append(os.path.basename(err_file[0].strip()))
             if os.path.exists('_condor_stdout') == True:
                file_list.append('_condor_stdout')
             else:
                out_file = grep('^Out\s+=\s+"(.*)"$', msg.data)
                if out_file != None and out_file[0] != None:
-                  file_list.append(os.path.basename(out_file[0].rstrip()))
+                  file_list.append(os.path.basename(out_file[0].strip()))
             for file in transfer_files[0].split(','):
                if file not in file_list:
-                  file_list.append(os.path.basename(file.rstrip()))
+                  file_list.append(os.path.basename(file.strip()))
          else:
             file_list = os.listdir(".")
       except:
@@ -804,15 +805,15 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
          return(FAILURE)
 
       for file in file_list:
-         if os.path.exists(file.rstrip()):
+         if os.path.exists(file.strip()):
             # Only parse the dir/file path if it actually is a dir/file
             # format (ie doesn't end in /)
-            if os.path.dirname(file.rstrip()) != '' and \
-               os.path.basename(file.rstrip()) != '' and \
-               os.path.exists(file.rstrip()) == True:
-               os.chdir(os.path.dirname(file.rstrip()))
+            if os.path.dirname(file.strip()) != '' and \
+               os.path.basename(file.strip()) != '' and \
+               os.path.exists(file.strip()) == True:
+               os.chdir(os.path.dirname(file.strip()))
                try:
-                  results_file.add(os.path.basename(file.rstrip()))
+                  results_file.add(os.path.basename(file.strip()))
                except:
                   saved_work.unlock()
                   sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
@@ -820,7 +821,7 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
                   return(FAILURE)
                os.chdir(work_cwd)
             else:
-               results_file.add(file.rstrip())
+               results_file.add(file.strip())
       try:
          results_file.close()
       except:
@@ -846,14 +847,14 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
          for line in msg.data.split('\n'):
             match = grep('^([^=]*)\s*=\s*(.+)$', line)
             if match != None and match[0] != None:
-               if match[0].rstrip().lower() == 'jobstatus':
+               if match[0].strip().lower() == 'jobstatus':
                   result_ad += 'JobStatus = 4\n'
                   continue
-               elif match[0].rstrip().lower() in remove_attribs:
+               elif match[0].strip().lower() in remove_attribs:
                   continue
-               elif match[0].rstrip() == 'EC2OrigOwner' and \
+               elif match[0].strip() == 'EC2OrigOwner' and \
                     match[1] != None:
-                  orig_owner = match[1].rstrip()
+                  orig_owner = match[1].strip()
                   continue
             if line != '':
                result_ad += line + "\n"
@@ -1030,11 +1031,14 @@ def main(argv=None):
       file.close()
 
       process = Popen(['openssl', 'rsautl', '-inkey', private_key_file, '-decrypt', '-in', '/root/data'], stdout=PIPE)
-      data = process.communicate()[0].rstrip()
+      data = process.communicate()[0].strip()
       os.remove('/root/data')
-      access_key = user_data[0].rstrip()
-      secret_key = data.rstrip()
-      queue_name = user_data[2].rstrip()
+      access_key = user_data[0].strip()
+      secret_key = data.strip()
+      queue_name = user_data[2].strip()
+
+      # Grab the region
+      region = user_data[3]
 
       try:
          sqs_config = read_condor_config('CARONIAD', ['IP', 'PORT', 'QUEUED_CONNECTIONS', 'LEASE_TIME', 'LEASE_CHECK_INTERVAL'], permit_param_only = False)
@@ -1056,7 +1060,8 @@ def main(argv=None):
       for attempt in range(1,5):
          try:
             # Open a connection to the AWS SQS service
-            sqs_connection = SQSConnection(access_key, secret_key)
+            r_obj = AWSRegion.get_sqs_region(region)
+            sqs_connection = SQSConnection(access_key, secret_key, region=r_obj)
 
             # Create the work queue if it doesn't exist
             work_queue = sqs_connection.create_queue('%s-%s' % (str(access_key), str(queue_name)))

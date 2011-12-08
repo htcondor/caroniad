@@ -33,8 +33,8 @@ SPECS/${EC2EHOOKS_SPEC}: ${EC2EHOOKS_SPEC}
 	mkdir -p SPECS
 	cp -f ${EC2EHOOKS_SPEC} SPECS
 
-SOURCES/${EC2EHOOKS_SOURCE}: hooks/sqs.py hooks/hook_cleanup.py \
-                         hooks/hook_job_finalize.py \
+SOURCES/${EC2EHOOKS_SOURCE}: hooks/sqs.py hooks/region.py \
+                         hooks/hook_cleanup.py hooks/hook_job_finalize.py \
                          hooks/hook_retrieve_status.py hooks/hook_translate.py \
                          config/60condor-ec2e-hooks.config.example
 	mkdir -p SOURCES
