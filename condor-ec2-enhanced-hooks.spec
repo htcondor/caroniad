@@ -1,5 +1,5 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 4pre1
+%define rel 4
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
