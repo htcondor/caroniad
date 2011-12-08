@@ -1,20 +1,19 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 4
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
-Version: 1.2
-Release: %{rel}%{?dist}
+Version: 1.3.0
+Release: 1%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://git.fedorahosted.org/git/grid/caroniad.git
-Source0: %{name}-%{version}-%{rel}.tar.gz
+Source0: %{name}-%{version}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
 Requires: python >= 2.3
 Requires: condor >= 7.2.0-4
 Requires: python-condorutils >= 1.5
-Requires: python-condorec2e = %{version}-%{release}
+Requires: python-condorec2e = %{version}
 Requires: python-boto >= 1.7a
 Requires: openssl
 
@@ -76,6 +75,9 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorec2e/region.py*
 
 %changelog
+* Thu Dec 8 2011  <rrati@redhat> - 1.3.0-1
+- Added support for aws region
+
 * Mon Aug 29 2011  <rrati@redhat> - 1.2-4
 - Raise exception if the translate hook is unable to read important files
 

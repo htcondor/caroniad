@@ -1,14 +1,13 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 3
 
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
-Version: 1.2
-Release: %{rel}%{?dist}
+Version: 1.3.0
+Release: 1%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://git.fedorahosted.org/git/grid/caroniad.git
-Source0: %{name}-%{version}-%{rel}.tar.gz
+Source0: %{name}-%{version}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
 Requires: python >= 2.4
@@ -62,6 +61,9 @@ exit 0
 %_sbindir/caroniad
 
 %changelog
+* Thu Dec 8 2011  <rrati@redhat> - 1.3.0-1
+- Added support for aws region
+
 * Mon Aug  9 2011  <rrati@redhat> - 1.2-3
 - Fixed configfile warning
 
