@@ -2,7 +2,7 @@
 
 Summary: Condor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
-Version: 1.3.0
+Version: 1.3.1
 Release: 1%{?dist}
 License: ASL 2.0
 Group: Applications/System
@@ -75,6 +75,10 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorec2e/region.py*
 
 %changelog
+* Thu Apr 5 2012  <rrati@redhat> - 1.3.1-1
+- Added additional parameters that give insight into job status in
+  the AMI (BZ738335)
+
 * Thu Dec 8 2011  <rrati@redhat> - 1.3.0-1
 - Added support for aws region
 
