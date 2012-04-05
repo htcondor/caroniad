@@ -65,16 +65,16 @@ def main(argv=None):
    # Read the source class ad from stdin and store it as well as the
    # job status.  The end of the source job is noted by '------'
    for line in sys.stdin:
-      if line.rstrip() == '------':
+      if line.strip() == '------':
          break
-      match = grep('^([^=]*)\s+=\s+(.*)$', line.lstrip())
+      match = grep('^([^=]*)\s+=\s+(.*)$', line.strip())
       if match != None and match[0] != None and match[1] != None:
-         attribute = match[0].rstrip().lower()
-         val_match = grep('^"(.*)"$', match[1].rstrip())
+         attribute = match[0].strip().lower()
+         val_match = grep('^"(.*)"$', match[1].strip())
          if val_match != None and val_match[0] != None:
-            value = val_match[0].rstrip().lstrip()
+            value = val_match[0].strip()
          else:
-            value = match[1].rstrip().lstrip()
+            value = match[1].strip()
          if attribute == 'iwd':
             iwd = value
             continue
@@ -97,14 +97,14 @@ def main(argv=None):
    # Read the routed class ad from stdin and store the S3 information and
    # the job status
    for line in sys.stdin:
-      match = grep('^([^=]*)\s*=\s*(.*)$', line.lstrip())
+      match = grep('^([^=]*)\s*=\s*(.*)$', line.strip())
       if match != None and match[0] != None and match[1] != None:
-         attribute = match[0].rstrip().lower()
-         val_match = grep('^"(.*)"$', match[1].rstrip())
+         attribute = match[0].strip().lower()
+         val_match = grep('^"(.*)"$', match[1].strip())
          if val_match != None and val_match[0] != None:
-            value = val_match[0].rstrip().lstrip()
+            value = val_match[0].strip()
          else:
-            value = match[1].rstrip().lstrip()
+            value = match[1].strip()
          if attribute == 's3bucketid':
             bucket = value
             continue
@@ -139,10 +139,10 @@ def main(argv=None):
       return(FAILURE)
    else:
       key_file = open(aws_key, 'r')
-      aws_key_val = key_file.readlines()[0].rstrip()
+      aws_key_val = key_file.readlines()[0].strip()
       key_file.close()
       key_file = open(aws_secret, 'r')
-      aws_secret_val = key_file.readlines()[0].rstrip()
+      aws_secret_val = key_file.readlines()[0].strip()
       key_file.close()
 
    # Connect to S3
@@ -282,7 +282,7 @@ def main(argv=None):
          # job completion
          job_status = grep('^JobStatus\s*=\s*(.)$', msg.class_ad)
          if job_status != None and job_status[0] != None and \
-            int(job_status[0].rstrip()) == 4:
+            int(job_status[0].strip()) == 4:
             # We found the update that indicates the job completed.  This
             # message is the update to the source job
             done_classad = msg.class_ad
@@ -294,7 +294,7 @@ def main(argv=None):
       # Remove attributes that shouldn't be updated
       for rm_attr in remove_attrs:
          for line in done_classad.split('\n'):
-            match = grep('^([^=]*)\s*=\s*(.*)$', line.lstrip())
+            match = grep('^([^=]*)\s*=\s*(.*)$', line.strip())
             if match != None and match[0] != None and match[1] != None:
                attribute = match[0].strip().lower()
                if rm_attr.lower() == attribute:
