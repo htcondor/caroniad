@@ -18,7 +18,7 @@ import os
 import re
 import pickle
 from boto.sqs.connection import SQSConnection
-from boto.exception import *
+from boto.exception import BotoServerError
 from condorutils import SUCCESS, FAILURE
 from condorutils.osutil import grep
 from condorutils.readconfig import *
@@ -129,6 +129,12 @@ def main(argv=None):
                key != None and key[0] != None:
                update_classad += 'S3KeyID = "%s"\n' % key[0]
 
+         # Look for EC2 job parameters
+         for param in ['EC2HookArg', 'EC2LastFailureReason']:
+            value = grep('^(%s.*)' % param, status_classad)
+            if value != None and value[0] != None:
+               update_classad += '%s\n' % value[0]
+
          # If the message notifies of a run attempt, increment the counter
          # on the number of runs attempts
          run_try = grep('^EC2JobAttempted\s*=\s*(.*)$', status_classad)
@@ -139,15 +145,17 @@ def main(argv=None):
          # Check the job status to see if this message notifies of
          # job completion
          job_status = grep('^JobStatus\s*=\s*(.)$', status_classad)
-         if job_status != None and job_status[0] != None and \
-            int(job_status[0].strip()) == 4:
-            # We found an update that indicates the job completed.
-            # Add a marker to the classad saying the job has completed.
-            update_classad += 'EC2JobSuccessful = True\n'
-         else:
-            # Remove the message from the queue only if it's not the success
-            # message
-            sqs_queue.delete_message(q_msg)
+         if job_status != None and job_status[0] != None:
+            job_status = int(job_status[0].strip())
+            if job_status == 4:
+               # We found an update that indicates the job completed.
+               # Add a marker to the classad saying the job has completed.
+               update_classad += 'EC2JobSuccessful = True\n'
+            else:
+               # Remove the message from the queue only if it's not the success
+               # message
+               sqs_queue.delete_message(q_msg)
+            update_classad += 'EC2JobStatus = %d' % job_status
 
          # Print the update information
          if update_classad != '':

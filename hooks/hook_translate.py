@@ -24,7 +24,7 @@ from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 from boto.sqs.connection import SQSConnection
 from boto.sqs.message import Message
-from boto.exception import *
+from boto.exception import BotoServerError
 from condorutils import SUCCESS, FAILURE
 from condorutils.osutil import grep
 from condorutils.readconfig import *

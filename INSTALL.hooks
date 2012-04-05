@@ -38,7 +38,7 @@ type is 32-bit, not 64-bit.
 
 The following fields can be defined, where applicable, to aid in routing the
 job to the proper AMI.  If only WantAWS is defined, then the job will be routed
-to the small AMI type.
+to the first route defined.
 
 WantAWS
     Values: True/False.
