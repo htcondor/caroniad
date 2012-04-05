@@ -347,16 +347,17 @@ def handle_get_work(req_socket, reply, sqs_con, queue, known_items, log_name):
    for line in reply.data.split('\n'):
       match = grep('^([^=]*)\s*=\s*(.*)$', line)
       if match != None and match[0] != None:
-         if match[0].strip().lower() in remove_attribs:
+         attr = match[0].strip().lower()
+         if attr in remove_attribs:
             continue
 
-         if match[0].strip().lower() == 'owner' and match[1] != None:
+         if attr == 'owner' and match[1] != None:
             ad += '%s = "condor"\n' % match[0].strip()
             ad += 'EC2OrigOwner = %s\n' % match[1].strip()
             continue
 
          # Check the file paths
-         if match[1] != None and match[0].strip().lower() in file_attribs:
+         if match[1] != None and attr in file_attribs:
             paths = grep ('^"(.+)"$', match[1])
             if paths != None and paths[0] != None:
                # We have a quoted string, so split on commas since there
@@ -465,20 +466,24 @@ def handle_reply_fetch(msg, sqs_con, work_q, status_q, known_items, log_name):
          if re.match('---', line) != None:
             break
          elif match != None and match[0] != None:
-            if match[0].strip().lower() in remove_attribs:
+            attr = match[0].strip().lower()
+            if attr in remove_attribs:
                continue
             elif match[0].strip().lower() == 'jobstatus':
-               result_ad += 'JobStatus = 2\n'
+               if msg.type == condor_wf_types.reply_claim_reject:
+                 result_ad += 'JobStatus = 1\n'
+                 result_ad += 'EC2LastFailureReason = "The job was rejected"\n'
+               else:
+                 result_ad += 'JobStatus = 2\n'
                continue
-            elif match[0].strip() == 'EC2OrigOwner' and match[1] != None:
+            elif attr == 'ec2origowner' and match[1] != None:
                orig_owner = match[1].strip()
-               continue
-            elif match[0].strip().lower() == 'owner':
                continue
          if line != '':
             result_ad += line + "\n"
       result_ad += 'Owner = %s\n' % orig_owner
       result_ad += 'EC2JobAttempted = True\n'
+      result_ad += 'EC2HookArg = %d\n' % msg.type
 
       try:
          response = pickle.loads(saved_work.SQS_msg.get_body())
@@ -638,19 +643,19 @@ def handle_update_job_status(msg, queue, known_items, log_name):
       for line in msg.data.split('\n'):
          match = grep('^([^=]*)\s*=\s*(.+)$', line)
          if match != None and match[0] != None:
-            if match[0].strip().lower() in remove_attribs:
+            attr = match[0].strip().lower()
+            if attr in remove_attribs:
                continue
             elif match[0].strip().lower() == 'jobstatus':
                result_ad += 'JobStatus = 2\n'
                continue
-            elif match[0].strip() == 'EC2OrigOwner' and match[1] != None:
+            elif attr == 'ec2origowner' and match[1] != None:
                orig_owner = match[1].strip()
-               continue
-            elif match[0].strip().lower() == 'owner':
                continue
          if line != '':
             result_ad += line + "\n"
       result_ad += 'Owner = %s\n' % orig_owner
+      result_ad += 'EC2HookArg = %d\n' % msg.type
 
       try:
          response = pickle.loads(saved_work.SQS_msg.get_body())
@@ -681,8 +686,7 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
    log(logging.INFO, log_name, '%s called' % func_name)
 
    file_list = []
-   remove_attribs = ['iwd', 'owner', 'jobfinishedhookdone', ]
-   normal_exit = 0
+   remove_attribs = ['iwd', 'owner', 'jobfinishedhookdone', 'jobstatus']
    global_id = ''
 
    # Determine the slot that is reporting results
@@ -739,139 +743,136 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
          saved_work.unlock()
          log(logging.WARNING, log_name, '%s: Unable to retrive job information for id %s' % (func_name, message_id))
 
-      try:
-         # If the S3 key is None, then there wasn't any input data for this
-         # job so we'll need to create a new key to store the data in.
-         # Otherwise, reuse the values from the message
-         s3_bucket = s3_storage.get_bucket(results.s3_bucket)
-         if results.s3_key != None:
-            s3_key = s3_bucket.get_key(results.s3_key)
-         else:
-            match = grep('^GlobalJobId\s*=\s*"(.*)"$', msg.data)
-            if match != None and match[0] != None:
-               global_id = match[0].replace('#', '').replace('@', '').replace('.', '')
-            aws_access_key = s3_storage.aws_access_key_id
-            s3_key = Key(s3_bucket)
-            s3_key.key = str(aws_access_key) + '-' + str(global_id)
-            results.s3_key = s3_key.key
-            msg.data += 'S3KeyID = "%s"\n' % s3_key.key
-      except:
-         sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
-         saved_work.unlock()
-         log(logging.WARNING, log_name, '%s: Unable to create storage bucket in S3 for id %s' % (func_name, message_id))
+      # The Class Ad we have doesn't reflect the appropriate state, so 
+      # change it to correct job state and remove  attributes that
+      # shouldn't have updated data sent to the originater.
+      result_ad = ''
+      start_time = 0
+      run_time = 0
+      orig_owner = ''
+      for line in msg.data.split('\n'):
+         match = grep('^([^=]*)\s*=\s*(.+)$', line)
+         if match != None and match[0] != None:
+            attr = match[0].strip().lower()
+            if attr in remove_attribs:
+               continue
+            elif attr == 'ec2origowner' and match[1] != None:
+               orig_owner = match[1].strip()
+               continue
+            elif attr == 'jobstartdate' and match[1] != None:
+               start_time = int(match[1])
+            elif attr == 'jobduration' and match[1] != None:
+               run_time = int(round(float(match[1])))
 
-      # Create the list of files to put into the results archive
-      if os.path.exists(work_cwd) == False:
-         sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
-         saved_work.unlock()
-         log(logging.ERROR, log_name, '%s: Unable to change to exe dir "%s" for id "%s"' % (func_name, work_cwd, str(message_id)))
-         return(FAILURE)
+         if line != '':
+            result_ad += line + "\n"
 
-      try:
-         os.chdir(work_cwd)
-         transfer_files = grep('^TransferOutput\s*=\s*"(.*)"$', msg.data)
-         if transfer_files != None and transfer_files[0] != None:
-            if os.path.exists('_condor_stderr') == True:
-               file_list.append('_condor_stderr')
-            else:
-               err_file = grep('^Err\s+=\s+"(.*)"$', msg.data)
-               if err_file != None and err_file[0] != None:
-                  file_list.append(os.path.basename(err_file[0].strip()))
-            if os.path.exists('_condor_stdout') == True:
-               file_list.append('_condor_stdout')
-            else:
-               out_file = grep('^Out\s+=\s+"(.*)"$', msg.data)
-               if out_file != None and out_file[0] != None:
-                  file_list.append(os.path.basename(out_file[0].strip()))
-            for file in transfer_files[0].split(','):
-               if file not in file_list:
-                  file_list.append(os.path.basename(file.strip()))
-         else:
-            file_list = os.listdir(".")
-      except:
-         saved_work.unlock()
-         sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
-         log(logging.ERROR, log_name, '%s: Failed to create list of files for results archive for id "%s"' % (func_name, str(message_id)))
-         return(FAILURE)
-
-      # Archive all the important files
-      results_filename = work_cwd + '/results.tar.gz'
-      try:
-         results_file = tarfile.open(results_filename, 'w:gz')
-      except:
-         saved_work.unlock()
-         sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
-         log(logging.ERROR, log_name, '%s: Failed to open archive file for writing for id "%s"' % (func_name, str(message_id)))
-         return(FAILURE)
-
-      for file in file_list:
-         if os.path.exists(file.strip()):
-            # Only parse the dir/file path if it actually is a dir/file
-            # format (ie doesn't end in /)
-            if os.path.dirname(file.strip()) != '' and \
-               os.path.basename(file.strip()) != '' and \
-               os.path.exists(file.strip()) == True:
-               os.chdir(os.path.dirname(file.strip()))
-               try:
-                  results_file.add(os.path.basename(file.strip()))
-               except:
-                  saved_work.unlock()
-                  sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
-                  log(logging.ERROR, log_name, '%s: Failed to write file "%s" to archive for id "%s"' % (func_name, file, str(message_id)))
-                  return(FAILURE)
-               os.chdir(work_cwd)
-            else:
-               results_file.add(file.strip())
-      try:
-         results_file.close()
-      except:
-         saved_work.unlock()
-         sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
-         log(logging.ERROR, log_name, '%s: Failed to write archive to disk for id "%s"' % (func_name, str(message_id)))
-         return(FAILURE)
+      result_ad += 'EC2HookArg = %d\n' % msg.type
+      result_ad += 'Owner = %s\n' % orig_owner
 
       if msg.type == condor_wf_types.exit_exit:
-         normal_exit = 1
          # Job exited normally, so upload the sandbox to S3,
          # and remove the message on the SQS work queue
          log(logging.DEBUG, log_name, '%s: Normal exit' % func_name)
 
-         # The Class Ad we have doesn't reflect the appropriate state, so 
-         # change it to say the job is completed(4).  Also remove
-         # attributes that shouldn't have updated data sent to the
-         # originater.
-         result_ad = ''
-         start_time = 0
-         run_time = 0
-         orig_owner = ''
-         for line in msg.data.split('\n'):
-            match = grep('^([^=]*)\s*=\s*(.+)$', line)
-            if match != None and match[0] != None:
-               if match[0].strip().lower() == 'jobstatus':
-                  result_ad += 'JobStatus = 4\n'
-                  continue
-               elif match[0].strip().lower() in remove_attribs:
-                  continue
-               elif match[0].strip() == 'EC2OrigOwner' and \
-                    match[1] != None:
-                  orig_owner = match[1].strip()
-                  continue
-            if line != '':
-               result_ad += line + "\n"
+         # Set job completed 
+         result_ad += 'JobStatus = 4\n'
 
-         # Set the job completion time by finding the start time and
-         # job duration from the class ad and add them together.
-         match = re.match('^JobStartDate\s*=\s*(.+)$', line)
-         if match != None and match.groups() != None:
-            start_time = int(match.groups()[0])
+         # Set the job completion time by adding together the start time and
+         # job duration from the class ad.
+         result_ad += 'JobFinishedHookDone = %s\n' % str(start_time + run_time)
 
-         match = re.match('^JobDuration\s*=\s*(.+)$', line)
-         if match != None and match.groups() != None:
-            run_time = int(round(float(match.groups()[0])))
+         try:
+            # If the S3 key is None, then there wasn't any input data for this
+            # job so we'll need to create a new key to store the data in.
+            # Otherwise, reuse the values from the message
+            s3_bucket = s3_storage.get_bucket(results.s3_bucket)
+            if results.s3_key != None:
+               s3_key = s3_bucket.get_key(results.s3_key)
+            else:
+               match = grep('^GlobalJobId\s*=\s*"(.*)"$', msg.data)
+               if match != None and match[0] != None:
+                  global_id = match[0].replace('#', '').replace('@', '').replace('.', '')
+               aws_access_key = s3_storage.aws_access_key_id
+               s3_key = Key(s3_bucket)
+               s3_key.key = str(aws_access_key) + '-' + str(global_id)
+               results.s3_key = s3_key.key
+               result_ad += 'S3KeyID = "%s"\n' % s3_key.key
+         except:
+            sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
+            saved_work.unlock()
+            log(logging.WARNING, log_name, '%s: Unable to create storage bucket in S3 for id %s' % (func_name, message_id))
 
-         result_ad += 'Owner = %s\n' % orig_owner
-         result_ad += 'JobFinishedHookDone = ' + str(start_time + run_time) + '\n'
-         results.class_ad = result_ad
+         # Create the list of files to put into the results archive
+         if os.path.exists(work_cwd) == False:
+            sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
+            saved_work.unlock()
+            log(logging.ERROR, log_name, '%s: Unable to change to exe dir "%s" for id "%s"' % (func_name, work_cwd, str(message_id)))
+            return(FAILURE)
+
+         try:
+            os.chdir(work_cwd)
+            transfer_files = grep('^TransferOutput\s*=\s*"(.*)"$', msg.data)
+            if transfer_files != None and transfer_files[0] != None:
+               if os.path.exists('_condor_stderr') == True:
+                  file_list.append('_condor_stderr')
+               else:
+                  err_file = grep('^Err\s+=\s+"(.*)"$', msg.data)
+                  if err_file != None and err_file[0] != None:
+                     file_list.append(os.path.basename(err_file[0].strip()))
+               if os.path.exists('_condor_stdout') == True:
+                  file_list.append('_condor_stdout')
+               else:
+                  out_file = grep('^Out\s+=\s+"(.*)"$', msg.data)
+                  if out_file != None and out_file[0] != None:
+                     file_list.append(os.path.basename(out_file[0].strip()))
+               for file in transfer_files[0].split(','):
+                  if file not in file_list:
+                     file_list.append(os.path.basename(file.strip()))
+            else:
+               file_list = os.listdir(".")
+         except:
+            saved_work.unlock()
+            sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
+            log(logging.ERROR, log_name, '%s: Failed to create list of files for results archive for id "%s"' % (func_name, str(message_id)))
+            return(FAILURE)
+
+         # Archive all the important files
+         results_filename = work_cwd + '/results.tar.gz'
+         try:
+            results_file = tarfile.open(results_filename, 'w:gz')
+         except:
+            saved_work.unlock()
+            sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
+            log(logging.ERROR, log_name, '%s: Failed to open archive file for writing for id "%s"' % (func_name, str(message_id)))
+            return(FAILURE)
+
+         for fname in file_list:
+            f = fname.strip()
+            if os.path.exists(f):
+               # Only parse the dir/file path if it actually is a dir/file
+               # format (ie doesn't end in /)
+               if os.path.dirname(f) != '' and \
+                  os.path.basename(f) != '' and \
+                  os.path.exists(f) == True:
+                  os.chdir(os.path.dirname(f))
+                  try:
+                     results_file.add(os.path.basename(f))
+                  except:
+                     saved_work.unlock()
+                     sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
+                     log(logging.ERROR, log_name, '%s: Failed to write file "%s" to archive for id "%s"' % (func_name, f, str(message_id)))
+                     return(FAILURE)
+                  os.chdir(work_cwd)
+               else:
+                  results_file.add(f)
+         try:
+            results_file.close()
+         except:
+            saved_work.unlock()
+            sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
+            log(logging.ERROR, log_name, '%s: Failed to write archive to disk for id "%s"' % (func_name, str(message_id)))
+            return(FAILURE)
 
          # Upload the sandbox to S3
          try:
@@ -884,16 +885,6 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
             log(logging.ERROR, log_name, 'Error: Unable to write results to S3')
             return(FAILURE)
 
-         # Send the results to the appropriate SQS queue
-         try:
-            results_q.write(Message(body=pickle.dumps(results)))
-         except:
-            # Reset the visibility timer so it can be read again quickly.
-            sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
-            saved_work.unlock()
-            log(logging.ERROR, log_name, 'Error: Unable to write job results message to SQS')
-            return(FAILURE)
-
          # Remove the message from the SQS queue
          try:
             work_q.delete_message(saved_work.SQS_msg)
@@ -903,23 +894,41 @@ def handle_exit(req_socket, msg, s3_storage, sqs_con, work_q, results_q, known_i
             # will prevent it from being run again
             saved_work.unlock()
             log(logging.ERROR, log_name, 'Error: Unable to delete SQS message')
-         saved_work.unlock()
-
-         if normal_exit == 1:
-            # Check if a shutdown delay was defined
-            delay = grep('^amazonamishutdowndelay\s*=\s*(.*)$', result_ad)
-            if delay != None and delay[0] != None:
-               time.sleep(int(delay[0]) * 60)
-
-            # Shutdown now that the job has finished
-            call(['shutdown',  '-h',  '-P',  'now'])
       else:
          # Job didn't exit normally
          log(logging.DEBUG, log_name, '%s: Not normal exit: %s' % (func_name, str(msg.type)))
 
+         # Set job idle 
+         result_ad += 'JobStatus = 1\n'
+
+         # Add a FailureReson
+         result_ad += 'EC2LastFailureReason = "HOOK_JOB_EXIT was called with a non-successful exit type (%d)"\n' % msg.type
+
+         # Reset the visibility timer so it can be read again quickly.
+         sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
+
+      results.class_ad = result_ad
+
+      # Send the results to the appropriate SQS queue
+      try:
+         results_q.write(Message(body=pickle.dumps(results)))
+      except:
          # Reset the visibility timer so it can be read again quickly.
          sqs_con.change_message_visibility(work_q, saved_work.SQS_msg.receipt_handle, 5)
          saved_work.unlock()
+         log(logging.ERROR, log_name, 'Error: Unable to write job results message to SQS')
+         return(FAILURE)
+
+      saved_work.unlock()
+
+      if msg.type == condor_wf_types.exit_exit:
+         # Check if a shutdown delay was defined
+         delay = grep('^amazonamishutdowndelay\s*=\s*(.*)$', result_ad)
+         if delay != None and delay[0] != None:
+            time.sleep(int(delay[0]) * 60)
+
+         # Shutdown now that the job has finished
+         call(['shutdown',  '-h',  '-P',  'now'])
 
    # Send acknowledgement to the originator that exit work is complete
    req_socket.send('Completed')
