@@ -18,7 +18,7 @@ import os
 import re
 import pickle
 from boto.sqs.connection import SQSConnection
-from boto.exception import *
+from boto.exception import BotoServerError
 from condorutils import SUCCESS, FAILURE
 from condorutils.osutil import grep
 from condorutils.readconfig import *
