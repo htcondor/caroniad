@@ -1,6 +1,6 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 
-Summary: Condor EC2 Enhanced hooks
+Summary: HTCondor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
 Version: 1.3.1
 Release: 1%{?dist}
@@ -18,14 +18,14 @@ Requires: python-boto >= 1.7a
 Requires: openssl
 
 %description
-The EC2 Enhanced feature allows for near seamless translation of Condor jobs
-in the vanilla universe to condor EC2 jobs in the grid universe.  For all
+The EC2 Enhanced feature allows for near seamless translation of HTCondor jobs
+in the vanilla universe to HTCondor EC2 jobs in the grid universe.  For all
 intents and purposes, the job runs as any vanilla universe job runs except
 on an Amazon EC2 AMI instance.
 
-This package provides Condor job router hooks that will translate a job into
-a Condor EC2 job and monitor the state of that job.  This should be installed
-on condor nodes that will submitting work and wish to use the EC2 Enhanced
+This package provides HTCondor job router hooks that will translate a job into
+a HTCondor EC2 job and monitor the state of that job.  This should be installed
+on HTCondor nodes that will submitting work and wish to use the EC2 Enhanced
 feature.
 
 %package -n python-condorec2e
@@ -37,7 +37,7 @@ Obsoletes: condor-ec2-enhanced-hooks-common
 Obsoletes: python-condor-ec2-enhanced-hooks-common
 
 %description -n python-condorec2e
-Common definitions used by condor's EC2 Enhanced functionality
+Common definitions used by HTCondor's EC2 Enhanced functionality
 
 %prep
 %setup -q

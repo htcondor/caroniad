@@ -19,14 +19,14 @@ Requires: python-boto >= 1.7a
 Requires: openssl
 
 %description
-The EC2 Enhanced feature allows for near seamless translation of Condor jobs
-in the vanilla universe to condor EC2 jobs in the grid universe.  For all
+The EC2 Enhanced feature allows for near seamless translation of HTCondor jobs
+in the vanilla universe to HTCondor EC2 jobs in the grid universe.  For all
 intents and purposes, the job runs as any vanilla universe job runs except
 on an Amazon EC2 AMI instance.
 
 This package contains the daemon that handles the communication between
-Condor and the Amazon Web Services (AWS).  This should be installed on an
-Amazon Machine Instance (AMI) that will be used with Condor's EC2 Enhanced
+HTCondor and the Amazon Web Services (AWS).  This should be installed on an
+Amazon Machine Instance (AMI) that will be used with HTCondor's EC2 Enhanced
 feature.
 
 %prep
