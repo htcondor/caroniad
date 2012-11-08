@@ -3,7 +3,7 @@
 Summary: EC2 Enhanced
 Name: condor-ec2-enhanced
 Version: 1.3.1
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://git.fedorahosted.org/git/grid/caroniad.git
@@ -61,6 +61,9 @@ exit 0
 %_sbindir/caroniad
 
 %changelog
+* Thu Nov 8 2012  <rrati@redhat> - 1.3.1-2
+- Updated for branding change to HTCondor
+
 * Thu Apr 5 2012  <rrati@redhat> - 1.3.1-1
 - Added additional parameters that give insight into job status in
   the AMI (BZ738335)
