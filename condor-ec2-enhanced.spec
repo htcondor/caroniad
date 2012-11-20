@@ -61,6 +61,9 @@ exit 0
 %_sbindir/caroniad
 
 %changelog
+* Tue Nov 20 2012  <rrati@redhat> - 1.2-4
+- Updated for branding change to HTCondor
+
 * Thu Nov 8 2012  <rrati@redhat> - 1.3.1-2
 - Updated for branding change to HTCondor
 
