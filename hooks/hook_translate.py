@@ -247,6 +247,14 @@ def main(argv=None):
                files.append(match[0].strip() + '\n')
             new_ad += attribute + ' = "' + split_val[1].strip() + '"\n'
             continue
+
+         # Set stdout/stderr files to be created in the sandox so they will
+         # be transfered back if they are actual files.
+         if (attr_lower == 'err' or attr_lower == 'out') and \
+            value != '/dev/null':
+            new_ad += attribute + ' = "' + os.path.basename(split_val[1]) + '"\n'
+            continue
+            
          new_ad += line + '\n'
    sqs_data.class_ad = new_ad
 

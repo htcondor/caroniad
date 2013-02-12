@@ -52,7 +52,6 @@ def main(argv=None):
    s3_bucket_obj = ''
    stdout = ''
    stderr = ''
-   remaps = ''
    ec2_success = "false"
    ret_val = SUCCESS
    cluster = 0
@@ -78,13 +77,10 @@ def main(argv=None):
          if attribute == 'iwd':
             iwd = value
             continue
-         if attribute == 'transferoutputremaps':
-            remaps = value
-            continue
-         if attribute == 'out' and value.lower() != '_condor_stdout':
+         if attribute == 'out' and value.lower() != '/dev/null':
             stdout = value
             continue
-         if attribute == 'err' and value.lower() != '_condor_stderr':
+         if attribute == 'err' and value.lower() != '/dev/null':
             stderr = value
             continue
          if attribute == 'clusterid':
@@ -203,19 +199,19 @@ def main(argv=None):
       os.remove(results_filename)
 
    # Place the extracted files in their proper locations, starting with the
-   # remaps
-   if remaps != '':
-      for remap in remaps.split(';'):
-         remap_info = remap.split('=')
-         if os.path.exists(remap_info[0]) == True:
-            os.rename(remap_info[0], remap_info[1])
+   # stdout/stderr files
+   for stdfile in [stdout, stderr]:
+      if stdfile != '':
+         local_file = os.path.basename(stdfile)
+         if os.path.exists(local_file) == True and '/' in stdfile:
+            os.rename(local_file, stdfile)
 
    for file in os.listdir('.'):
       try:
          dest_file = '%s/%s' % (iwd, file)
          if os.path.exists(dest_file):
             # Only copy files if they are different in size.  This is needed
-            # because newer versions of shutil execpt if the destination file
+            # because newer versions of shutil except if the destination file
             # exists.
             if os.stat(dest_file).st_size != os.stat(file).st_size:
                shutil.copy2(file, iwd)
