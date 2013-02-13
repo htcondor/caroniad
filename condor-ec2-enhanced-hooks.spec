@@ -2,8 +2,8 @@
 
 Summary: HTCondor EC2 Enhanced hooks
 Name: condor-ec2-enhanced-hooks
-Version: 1.3.1
-Release: 2%{?dist}
+Version: 1.3.2
+Release: 1%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://git.fedorahosted.org/git/grid/caroniad.git
@@ -75,6 +75,9 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorec2e/region.py*
 
 %changelog
+* Tue Feb 12 2013  <rrati@redhat> - 1.3.2-1
+- The hooks now do stdout/err remapping (BZ910408)
+
 * Thu Nov 8 2012  <rrati@redhat> - 1.3.1-2
 - Updated for branding change to HTCondor
 
